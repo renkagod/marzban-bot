@@ -132,6 +132,7 @@ async def test_create_invoice_handler_success():
     
     db = AsyncMock()
     crypto = AsyncMock()
+    crypto.get_exchange_rates.return_value = [{"source": "USDT", "target": "RUB", "rate": "100.0"}]
     crypto.create_invoice.return_value = {
         "invoice_id": 999,
         "pay_url": "https://pay.link"
@@ -147,4 +148,5 @@ async def test_create_invoice_handler_success():
         provider="CryptoBot",
         external_id="999"
     )
-    assert "Счет на 150.0 руб. создан" in callback.message.edit_text.call_args[0][0]
+    assert "Счет на 150.0 руб." in callback.message.edit_text.call_args[0][0]
+    assert "USDT) создан" in callback.message.edit_text.call_args[0][0]

@@ -71,3 +71,9 @@ class CryptoBotClient:
             params["status"] = status
             
         return await self._request("GET", "getInvoices", params=params)
+
+    async def get_exchange_rates(self) -> List[Dict]:
+        """Returns the current exchange rates."""
+        return await self._request("GET", "getExchangeRates")
+
+    

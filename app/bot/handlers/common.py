@@ -34,8 +34,22 @@ async def create_invoice_handler(callback: CallbackQuery, db: DatabaseManager, c
     amount_rub = float(callback.data.split(":")[1])
     
     try:
+        # Get exchange rate
+        rates = await crypto.get_exchange_rates()
+        # Find USDT to RUB rate
+        usdt_rub_rate = next((float(r['rate']) for r in rates if r['source'] == 'USDT' and r['target'] == 'RUB'), None)
+        
+        if not usdt_rub_rate:
+            await callback.answer("Не удалось получить курс валют. Попробуйте позже.", show_alert=True)
+            return
+
+        # Calculate USDT amount with markup
+        markup = float(os.getenv("PAYMENT_MARKUP_PERCENT", "0")) / 100
+        amount_usdt = (amount_rub / usdt_rub_rate) * (1 + markup)
+        amount_usdt = round(amount_usdt, 2) # CryptoBot likes strings or rounded floats
+
         invoice = await crypto.create_invoice(
-            amount=amount_rub, 
+            amount=amount_usdt, 
             asset="USDT",
             description=f"Пополнение баланса на {amount_rub} руб.",
             payload=str(callback.from_user.id)
@@ -43,17 +57,18 @@ async def create_invoice_handler(callback: CallbackQuery, db: DatabaseManager, c
         
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="💳 Оплатить", url=invoice['pay_url'])],
-            [InlineKeyboardButton(text="✅ Проверить оплату", callback_data=f"check_pay:{invoice['invoice_id']}")],
+            [InlineKeyboardButton(text="✅ Проверить оплату", callback_data=f"check_pay:{invoice['invoice_id']}:{amount_rub}")],
             [InlineKeyboardButton(text="🔙 Назад", callback_data="top_up")]
         ])
         
         await callback.message.edit_text(
-            f"Счет на {amount_rub} руб. создан!\n\n"
+            f"Счет на {amount_rub} руб. (~{amount_usdt} USDT) создан!\n\n"
+            f"Курс: {usdt_rub_rate} руб/USDT (включая наценку {os.getenv('PAYMENT_MARKUP_PERCENT', '0')}%).\n\n"
             "После оплаты нажмите кнопку 'Проверить оплату'.",
             reply_markup=keyboard
         )
         
-        # Log pending payment in DB
+        # Log pending payment in DB (we store RUB amount to add to balance later)
         await db.add_payment(
             telegram_id=callback.from_user.id,
             amount=amount_rub,
@@ -67,7 +82,9 @@ async def create_invoice_handler(callback: CallbackQuery, db: DatabaseManager, c
 
 @router.callback_query(F.data.startswith("check_pay:"))
 async def check_payment_handler(callback: CallbackQuery, db: DatabaseManager, bot: Bot, crypto: CryptoBotClient):
-    invoice_id = int(callback.data.split(":")[1])
+    data_parts = callback.data.split(":")
+    invoice_id = int(data_parts[1])
+    amount_rub = float(data_parts[2]) if len(data_parts) > 2 else 0.0
     
     try:
         invoices = await crypto.get_invoices(invoice_ids=[invoice_id])
@@ -80,11 +97,14 @@ async def check_payment_handler(callback: CallbackQuery, db: DatabaseManager, bo
             # Update payment in DB
             db_payment = await db.get_payment_by_external_id(str(invoice_id))
             if db_payment and db_payment['status'] == 'pending':
+                # Use stored RUB amount if available, otherwise fallback to external invoice amount
+                credit_amount = db_payment['amount'] if db_payment['amount'] > 0 else amount_rub
+                
                 await db.update_payment_status(db_payment['id'], "completed")
-                await db.update_balance(callback.from_user.id, float(invoice['amount']))
+                await db.update_balance(callback.from_user.id, credit_amount)
                 
                 await callback.message.edit_text(
-                    f"✅ Оплата подтверждена! Ваш баланс пополнен на {invoice['amount']} руб."
+                    f"✅ Оплата подтверждена! Ваш баланс пополнен на {credit_amount} руб."
                 )
                 
                 # Notify Admin
