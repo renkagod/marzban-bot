@@ -172,15 +172,32 @@ async def process_subscription_action(user_id: int, action: str, days: int, marz
         limit_gb = int(os.getenv("DEFAULT_DATA_LIMIT_GB", "50"))
         data_limit = (limit_gb * 1024**3) if limit_gb > 0 else None
         
-        # Ensure we at least enable vless and vmess as defaults if not specified
-        user_data = {
-            "username": marzban_username,
-            "proxies": {"vless": {}, "vmess": {}}, 
-            "expire": int((datetime.now() + timedelta(days=days)).timestamp()),
-            "data_limit": data_limit,
-            "note": user_note
-        }
-        await marzban.create_user(user_data)
+        expire_ts = int((datetime.now() + timedelta(days=days)).timestamp())
+        
+        # Try creating with both vless and vmess (modern default)
+        # If it fails with 400, fallback to vless only (older or restricted servers)
+        try:
+            user_data = {
+                "username": marzban_username,
+                "proxies": {"vless": {}, "vmess": {}}, 
+                "expire": expire_ts,
+                "data_limit": data_limit,
+                "note": user_note
+            }
+            await marzban.create_user(user_data)
+        except Exception as e:
+            if "400" in str(e) or "Bad Request" in str(e):
+                logger.warning(f"Failed to create user with vmess, retrying with vless only: {e}")
+                user_data = {
+                    "username": marzban_username,
+                    "proxies": {"vless": {}}, 
+                    "expire": expire_ts,
+                    "data_limit": data_limit,
+                    "note": user_note
+                }
+                await marzban.create_user(user_data)
+            else:
+                raise e
     else:
         try:
             m_user = await marzban.get_user(marzban_username)
@@ -241,11 +258,21 @@ async def check_payment_handler(callback: CallbackQuery, db: DatabaseManager, bo
                     _, action, days, price = payload.split(":")
                     days, price = int(days), int(price)
                     user = await db.get_user(callback.from_user.id)
+                    
                     if user['balance'] >= price:
-                        await process_subscription_action(callback.from_user.id, action, days, marzban, callback.from_user, db)
-                        await db.update_balance(callback.from_user.id, -float(price))
-                        await callback.message.answer("Оплата подтверждена, подписка активирована")
-                    else: await callback.message.answer("Оплата подтверждена, баланс пополнен")
+                        try:
+                            await process_subscription_action(callback.from_user.id, action, days, marzban, callback.from_user, db)
+                            await db.update_balance(callback.from_user.id, -float(price))
+                            await callback.message.answer("Оплата подтверждена, подписка активирована!")
+                        except Exception as e:
+                            logger.error(f"Auto-subscription failed after payment: {e}")
+                            await callback.message.answer(
+                                "Оплата подтверждена, баланс пополнен.\n\n"
+                                "К сожалению, произошла ошибка при автоматической активации подписки. "
+                                "Вы можете активировать её вручную через меню 'Мои услуги'."
+                            )
+                    else:
+                        await callback.message.answer("Оплата подтверждена, баланс пополнен")
                 else: await callback.message.edit_text("Оплата подтверждена")
                 await bot.send_message(os.getenv("ADMIN_CHANNEL_ID"), f"Новая оплата\n\nПользователь: {callback.from_user.mention_html()}\nСумма: {db_p['amount']} руб.", message_thread_id=os.getenv("ADMIN_PAYMENTS_TOPIC_ID"))
                 await my_subscription_handler(callback, db, marzban)

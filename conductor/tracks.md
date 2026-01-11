@@ -14,5 +14,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-## [~] Track: Referral System & Pricing Groups
-*Link: [./conductor/tracks/referrals_groups_20260111/](./conductor/tracks/referrals_groups_20260111/)*
+## [~] Track: Payment Fixes & FreeKassa Integration
+*Link: [./conductor/tracks/payment_fixes_freekassa_20260111/](./conductor/tracks/payment_fixes_freekassa_20260111/)*
