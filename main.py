@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from app.bot.manager import BotManager
 from app.core.database import DatabaseManager
 from app.core.marzban_client import MarzbanManager
+from app.core.monitor import HealthMonitor
 
 # Configure logging
 logging.basicConfig(
@@ -31,13 +32,23 @@ async def main():
     
     bot_manager = BotManager(bot_token)
     
+    # Initialize Health Monitor
+    monitor = HealthMonitor(
+        marzban, 
+        bot_manager.bot, 
+        os.getenv("ADMIN_CHANNEL_ID")
+    )
+    
     # Inject dependencies into DP if needed via dp.workflow_data
     bot_manager.dp["db"] = db
     bot_manager.dp["marzban"] = marzban
 
     try:
+        # Start health monitor as background task
+        monitor_task = asyncio.create_task(monitor.run())
         await bot_manager.start()
     finally:
+        monitor.stop()
         await bot_manager.stop()
         await db.disconnect()
 
