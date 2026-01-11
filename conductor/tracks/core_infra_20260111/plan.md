@@ -16,7 +16,7 @@
 - [x] Task: Bot Engine Implementation (2fdb2ae)
     - [ ] Sub-task: Set up Aiogram dispatcher and basic handlers
     - [ ] Sub-task: Implement 'Failure Isolation' middleware to catch API errors
-- [ ] Task: Admin Group Management
+- [x] Task: Admin Group Management (8ba98df)
     - [ ] Sub-task: Create admin-only command to manage 'Inner Circle' members
     - [ ] Sub-task: Implement interactive menus for selecting and tagging users
 - [ ] Task: Health Monitoring Service
