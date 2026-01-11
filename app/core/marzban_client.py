@@ -1,4 +1,4 @@
-from marzban import MarzbanAPI
+from marzban import MarzbanAPI, UserCreate, UserModify
 import logging
 
 logger = logging.getLogger(__name__)
@@ -40,9 +40,13 @@ class MarzbanManager:
     async def create_user(self, user_dict: dict):
         """Создает пользователя."""
         await self._ensure_token()
-        return await self.client.add_user(user_dict, token=self.token)
+        # Превращаем словарь в объект UserCreate
+        user_obj = UserCreate(**user_dict)
+        return await self.client.add_user(user_obj, token=self.token)
 
     async def modify_user(self, username: str, user_dict: dict):
         """Изменяет данные пользователя (например, продление)."""
         await self._ensure_token()
-        return await self.client.modify_user(username, user_dict, token=self.token)
+        # Превращаем словарь в объект UserModify
+        user_obj = UserModify(**user_dict)
+        return await self.client.modify_user(username, user_obj, token=self.token)

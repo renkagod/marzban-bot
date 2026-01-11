@@ -74,4 +74,23 @@ async def test_create_user(mock_marzban, config):
     mock_client.add_user = AsyncMock(return_value={"username": "new"})
     
     manager = MarzbanManager(config["address"], config["username"], config["password"])
-    assert await manager.create_user({"username": "new"}) == {"username": "new"}
+    await manager.create_user({"username": "new"})
+    
+    # Check that it was called with some object (UserCreate)
+    args, kwargs = mock_client.add_user.call_args
+    assert args[0].username == "new"
+
+@pytest.mark.asyncio
+@patch("app.core.marzban_client.MarzbanAPI")
+async def test_modify_user(mock_marzban, config):
+    mock_client = MagicMock()
+    mock_marzban.return_value = mock_client
+    mock_client.get_token = AsyncMock(return_value="test_token")
+    mock_client.modify_user = AsyncMock(return_value={"username": "mod"})
+    
+    manager = MarzbanManager(config["address"], config["username"], config["password"])
+    await manager.modify_user("test_user", {"expire": 12345678})
+    
+    args, kwargs = mock_client.modify_user.call_args
+    assert args[0] == "test_user"
+    assert args[1].expire == 12345678
