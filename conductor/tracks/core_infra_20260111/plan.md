@@ -1,7 +1,7 @@
-﻿# Track Plan: Core Infrastructure and Admin Management
+# Track Plan: Core Infrastructure and Admin Management
 
 ## Phase 1: Foundation & API
-- [~] Task: Project Initialization
+- [x] Task: Project Initialization (55177b0)
     - [ ] Sub-task: Create directory structure and pyproject.toml/requirements.txt
     - [ ] Sub-task: Configure environment variables (.env) for Bot Token and Marzban credentials
 - [ ] Task: Database Setup
