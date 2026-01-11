@@ -115,10 +115,9 @@ async def my_subscription_handler(callback: CallbackQuery, db: DatabaseManager, 
         
         if full_sub_url:
             import urllib.parse
-            # Redirect URL using the bot's domain to bypass Telegram restrictions
-            base_redirect = f"{sub_prefix}/" if sub_prefix else "/"
-            v2ray_url = f"{sub_prefix}/?url=" + urllib.parse.quote(f"v2raytun://import/{full_sub_url}")
-            streisand_url = f"{sub_prefix}/?url=" + urllib.parse.quote(f"streisand://import/{full_sub_url}")
+            # Use /redirect path which we will define in Nginx for reliable 301
+            v2ray_url = f"{sub_prefix}/redirect?url=" + urllib.parse.quote(f"v2raytun://import/{full_sub_url}")
+            streisand_url = f"{sub_prefix}/redirect?url=" + urllib.parse.quote(f"streisand://import/{full_sub_url}")
             
             buttons.append([InlineKeyboardButton(text="Открыть в браузере", url=full_sub_url)])
             buttons.append([
