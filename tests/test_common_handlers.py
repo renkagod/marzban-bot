@@ -39,7 +39,7 @@ async def test_check_subscription_handler_success():
         await check_subscription_handler(callback, db)
     
     db.add_user.assert_called_with(123, "testuser")
-    callback.answer.assert_called_with("Подписка подтверждена!")
+    callback.answer.assert_called_with("Подписка подтверждена")
     callback.message.delete.assert_called_once()
 
 @pytest.mark.asyncio
@@ -56,7 +56,7 @@ async def test_check_subscription_handler_fail():
         await check_subscription_handler(callback, db)
     
     db.add_user.assert_not_called()
-    callback.answer.assert_called_with("Вы не подписаны на канал!")
+    callback.answer.assert_called_with("Вы не подписаны на канал")
 
 @pytest.mark.asyncio
 async def test_my_subscription_handler_success():
