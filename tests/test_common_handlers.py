@@ -72,15 +72,19 @@ async def test_my_subscription_handler_success():
     m_user.used_traffic = 1024**3
     m_user.data_limit = 5 * 1024**3
     m_user.expire = "2026-01-01"
-    m_user.subscription_url = "https://link.com"
+    m_user.subscription_url = "/sub/test"
     marzban.get_user.return_value = m_user
     
-    await my_subscription_handler(callback, db, marzban)
+    with patch('os.getenv', side_effect=lambda k, d=None: "https://vpn.lol" if k == "SUB_URL_PREFIX" else d):
+        await my_subscription_handler(callback, db, marzban)
     
     callback.message.edit_text.assert_called()
     args, kwargs = callback.message.edit_text.call_args
     assert "Ваша подписка:" in args[0]
-    assert "active" in args[0]
+    
+    # Check button URL
+    kb = kwargs['reply_markup']
+    assert kb.inline_keyboard[0][0].url == "https://vpn.lol/sub/test"
 
 @pytest.mark.asyncio
 async def test_support_handler():

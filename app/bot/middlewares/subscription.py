@@ -44,6 +44,17 @@ class SubscriptionMiddleware(BaseMiddleware):
 
                 # Register user in DB upon successful subscription check
                 await db.add_user(user_id, event.from_user.username, referred_by=referred_by)
+                
+                # Notify referrer if exists
+                if referred_by:
+                    try:
+                        await event.bot.send_message(
+                            chat_id=referred_by,
+                            text=f"🤝 По вашей реферальной ссылке зарегистрировался новый пользователь: {event.from_user.mention_html()}!"
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to notify referrer {referred_by}: {e}")
+                
                 return await handler(event, data)
         except Exception as e:
             logger.error(f"Error checking subscription: {e}")

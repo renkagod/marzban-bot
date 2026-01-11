@@ -207,17 +207,21 @@ async def my_subscription_handler(callback: CallbackQuery, db: DatabaseManager, 
         
         status_emoji = "🟢" if m_user.status == "active" else "🔴"
         
+        # Format subscription URL
+        sub_prefix = os.getenv("SUB_URL_PREFIX", "").rstrip("/")
+        full_sub_url = f"{sub_prefix}{m_user.subscription_url}" if sub_prefix else m_user.subscription_url
+
         text = (
-            f"<b>Ваша подписка:</b>\n\n"
+            f"<b>💎 Ваша подписка:</b>\n\n"
             f"👤 <b>Логин:</b> <code>{m_user.username}</code>\n"
             f"📡 <b>Статус:</b> {status_emoji} {m_user.status}\n"
             f"📊 <b>Трафик:</b> {round(m_user.used_traffic / (1024**3), 2)} ГБ / "
             f"{round(m_user.data_limit / (1024**3), 2) if m_user.data_limit else '∞'} ГБ\n"
-            f"📅 <b>Истекает:</b> {m_user.expire if m_user.expire else 'Никогда'}\n\n"
-            f"🔗 <b>Ссылка:</b> <code>{m_user.subscription_url}</code>"
+            f"📅 <b>Истекает:</b> {m_user.expire if m_user.expire else 'Никогда'}"
         )
         
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔗 Открыть в браузере", url=full_sub_url)],
             [InlineKeyboardButton(text="🖼 Получить QR-код", callback_data=f"get_qr:{marzban_username}")],
             [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")]
         ])
