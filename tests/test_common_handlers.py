@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from app.bot.handlers.common import start_cmd, check_subscription_handler, my_subscription_handler, support_handler, get_qr_handler, top_up_menu, create_invoice_handler
+from app.bot.handlers.common import start_cmd, check_subscription_handler, my_subscription_handler, support_handler, get_qr_handler, top_up_menu, create_invoice_handler, referral_menu
 from aiogram.types import Message, CallbackQuery, ChatMemberMember, ChatMemberLeft
 
 @pytest.mark.asyncio
@@ -150,3 +150,24 @@ async def test_create_invoice_handler_success():
     )
     assert "Счет на 150.0 руб." in callback.message.edit_text.call_args[0][0]
     assert "USDT) создан" in callback.message.edit_text.call_args[0][0]
+
+@pytest.mark.asyncio
+async def test_referral_menu():
+    callback = AsyncMock(spec=CallbackQuery)
+    callback.from_user = MagicMock()
+    callback.from_user.id = 123
+    callback.message = AsyncMock()
+    callback.message.edit_text = AsyncMock()
+    
+    # Mock bot.get_me for username
+    callback.bot.get_me = AsyncMock(return_value=MagicMock(username="bot_user"))
+    
+    db = AsyncMock()
+    db.get_referral_count.return_value = 5
+    
+    await referral_menu(callback, db)
+    
+    callback.message.edit_text.assert_called()
+    args, kwargs = callback.message.edit_text.call_args
+    assert "Приглашено: 5 чел." in args[0]
+    assert "start=123" in args[0]

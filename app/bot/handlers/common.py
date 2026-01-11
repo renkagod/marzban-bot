@@ -165,10 +165,33 @@ async def start_cmd(message: Message, db: DatabaseManager):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💎 Моя подписка", callback_data="my_subscription")],
         [InlineKeyboardButton(text="💳 Пополнить баланс", callback_data="top_up")],
+        [InlineKeyboardButton(text="👫 Рефералы", callback_data="referrals")],
         [InlineKeyboardButton(text="🆘 Поддержка", callback_data="support")]
     ])
 
     await message.answer(text, reply_markup=keyboard)
+
+@router.callback_query(F.data == "referrals")
+async def referral_menu(callback: CallbackQuery, db: DatabaseManager):
+    user_id = callback.from_user.id
+    count = await db.get_referral_count(user_id)
+    
+    bot_info = await callback.bot.get_me()
+    referral_link = f"https://t.me/{bot_info.username}?start={user_id}"
+    
+    text = (
+        f"<b>👫 Реферальная программа</b>\n\n"
+        f"Приглашайте друзей и получайте бонусы!\n\n"
+        f"📊 <b>Ваша статистика:</b>\n"
+        f"👥 Приглашено: {count} чел.\n\n"
+        f"🔗 <b>Ваша ссылка:</b>\n<code>{referral_link}</code>"
+    )
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")]
+    ])
+    
+    await callback.message.edit_text(text, reply_markup=keyboard)
 
 @router.callback_query(F.data == "my_subscription")
 async def my_subscription_handler(callback: CallbackQuery, db: DatabaseManager, marzban: MarzbanManager):
@@ -219,6 +242,7 @@ async def back_to_main_handler(callback: CallbackQuery, db: DatabaseManager):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💎 Моя подписка", callback_data="my_subscription")],
         [InlineKeyboardButton(text="💳 Пополнить баланс", callback_data="top_up")],
+        [InlineKeyboardButton(text="👫 Рефералы", callback_data="referrals")],
         [InlineKeyboardButton(text="🆘 Поддержка", callback_data="support")]
     ])
 
