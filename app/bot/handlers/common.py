@@ -110,9 +110,15 @@ async def check_payment_handler(callback: CallbackQuery, db: DatabaseManager, bo
                 # Notify Admin
                 admin_channel_id = os.getenv("ADMIN_CHANNEL_ID")
                 admin_topic_id = os.getenv("ADMIN_PAYMENTS_TOPIC_ID")
+                user_mention = callback.from_user.mention_html()
                 await bot.send_message(
                     chat_id=admin_channel_id,
-                    text=f"💰 Новая оплата!\nПользователь: {callback.from_user.full_name} ({callback.from_user.id})\nСумма: {invoice['amount']} руб.",
+                    text=(
+                        f"💰 <b>Новая оплата!</b>\n\n"
+                        f"👤 <b>Пользователь:</b> {user_mention}\n"
+                        f"🆔 <b>ID:</b> <code>{callback.from_user.id}</code>\n"
+                        f"💵 <b>Сумма:</b> {credit_amount} руб."
+                    ),
                     message_thread_id=admin_topic_id if admin_topic_id else None
                 )
             else:
