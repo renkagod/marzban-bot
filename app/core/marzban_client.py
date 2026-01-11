@@ -5,33 +5,39 @@ logger = logging.getLogger(__name__)
 
 class MarzbanManager:
     def __init__(self, address: str, username: str = None, password: str = None):
-        self.client = MarzbanAPI(
-            address=address,
-            username=username,
-            password=password
-        )
+        # Используем base_url вместо address
+        self.client = MarzbanAPI(base_url=address)
+        self.username = username
+        self.password = password
+        self.token = None
 
-    def check_connectivity(self) -> bool:
-        """
-        Checks connectivity by attempting to get system stats.
-        Returns True if successful, False otherwise.
-        """
+    async def _ensure_token(self):
+        """Получает токен, если он еще не получен."""
+        if not self.token and self.username and self.password:
+            token_obj = await self.client.get_token(self.username, self.password)
+            self.token = token_obj.access_token if hasattr(token_obj, 'access_token') else token_obj
+
+    async def check_connectivity(self) -> bool:
+        """Проверяет связь с API."""
         try:
-            self.client.get_system_stats()
+            await self._ensure_token()
+            await self.client.get_system_stats(token=self.token)
             return True
         except Exception as e:
             logger.error(f"Failed to connect to Marzban API: {e}")
             return False
 
-    def get_stats(self):
-        """Returns server stats."""
-        return self.client.get_system_stats()
+    async def get_stats(self):
+        """Возвращает статистику сервера."""
+        await self._ensure_token()
+        return await self.client.get_system_stats(token=self.token)
 
-    def get_user(self, username: str):
-        """Returns user information from Marzban."""
-        return self.client.get_user(username)
+    async def get_user(self, username: str):
+        """Возвращает информацию о пользователе."""
+        await self._ensure_token()
+        return await self.client.get_user(username, token=self.token)
 
-    def create_user(self, user_dict: dict):
-        """Creates a user in Marzban."""
-        # Using add_user from MarzbanAPI
-        return self.client.add_user(user_dict)
+    async def create_user(self, user_dict: dict):
+        """Создает пользователя."""
+        await self._ensure_token()
+        return await self.client.add_user(user_dict, token=self.token)
