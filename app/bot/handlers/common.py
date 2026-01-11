@@ -130,11 +130,15 @@ async def checkout_handler(callback: CallbackQuery, db: DatabaseManager, marzban
 
     try:
         if action == "buy":
+            # Handle data limit from env
+            limit_gb = int(os.getenv("DEFAULT_DATA_LIMIT_GB", "50"))
+            data_limit = (limit_gb * 1024**3) if limit_gb > 0 else None
+
             user_data = {
                 "username": marzban_username,
                 "proxies": {"vless": {}}, # Enable at least one proxy
                 "expire": int((datetime.now() + timedelta(days=days)).timestamp()),
-                "data_limit": 50 * 1024**3
+                "data_limit": data_limit
             }
             await marzban.create_user(user_data)
         else:
