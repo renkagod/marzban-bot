@@ -9,5 +9,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-## [ ] Track: User Subscription & Payments
+## [x] Track: User Subscription & Payments
 *Link: [./conductor/tracks/user_payments_20260111/](./conductor/tracks/user_payments_20260111/)*
