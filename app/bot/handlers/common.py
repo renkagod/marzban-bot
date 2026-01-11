@@ -115,9 +115,12 @@ async def my_subscription_handler(callback: CallbackQuery, db: DatabaseManager, 
         
         if full_sub_url:
             import urllib.parse
-            # Use absolute URL for the redirector
-            v2ray_url = f"https://vpn.renka.lol/redirect?url=" + urllib.parse.quote(f"v2raytun://import/{full_sub_url}")
-            streisand_url = f"https://vpn.renka.lol/redirect?url=" + urllib.parse.quote(f"streisand://import/{full_sub_url}")
+            # Standard encoding for the app protocols
+            v2ray_proto = f"v2raytun://import/{full_sub_url}"
+            streisand_proto = f"streisand://import/{full_sub_url}"
+            
+            v2ray_url = f"https://vpn.renka.lol/redirect?url={urllib.parse.quote(v2ray_proto, safe='')}"
+            streisand_url = f"https://vpn.renka.lol/redirect?url={urllib.parse.quote(streisand_proto, safe='')}"
             
             buttons.append([InlineKeyboardButton(text="Открыть в браузере", url=full_sub_url)])
             buttons.append([
