@@ -7,6 +7,7 @@ from app.bot.manager import BotManager
 from app.core.database import DatabaseManager
 from app.core.marzban_client import MarzbanManager
 from app.core.monitor import HealthMonitor
+from app.core.cryptobot import CryptoBotClient
 
 # Configure logging
 logging.basicConfig(
@@ -30,6 +31,12 @@ async def main():
     
     marzban = MarzbanManager(marzban_address, marzban_user, marzban_pass)
     
+    # Initialize CryptoBot
+    crypto = CryptoBotClient(
+        api_token=os.getenv("CRYPTOBOT_TOKEN"),
+        testnet=os.getenv("CRYPTOBOT_TESTNET", "False").lower() == "true"
+    )
+    
     bot_manager = BotManager(bot_token)
     
     # Initialize Health Monitor
@@ -39,9 +46,10 @@ async def main():
         os.getenv("ADMIN_CHANNEL_ID")
     )
     
-    # Inject dependencies into DP if needed via dp.workflow_data
+    # Inject dependencies into DP
     bot_manager.dp["db"] = db
     bot_manager.dp["marzban"] = marzban
+    bot_manager.dp["crypto"] = crypto
 
     try:
         # Start health monitor as background task

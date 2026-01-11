@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from app.bot.handlers.common import start_cmd, check_subscription_handler, my_subscription_handler, support_handler, get_qr_handler
+from app.bot.handlers.common import start_cmd, check_subscription_handler, my_subscription_handler, support_handler, get_qr_handler, top_up_menu, create_invoice_handler
 from aiogram.types import Message, CallbackQuery, ChatMemberMember, ChatMemberLeft
 
 @pytest.mark.asyncio
@@ -110,3 +110,44 @@ async def test_get_qr_handler_success():
     args, kwargs = callback.message.answer_photo.call_args
     assert "user_123" in kwargs['caption']
     callback.answer.assert_called_once()
+
+@pytest.mark.asyncio
+async def test_top_up_menu():
+    callback = AsyncMock(spec=CallbackQuery)
+    callback.message = AsyncMock()
+    callback.message.edit_text = AsyncMock()
+    
+    await top_up_menu(callback)
+    callback.message.edit_text.assert_called()
+    assert "Выберите сумму" in callback.message.edit_text.call_args[0][0]
+
+@pytest.mark.asyncio
+async def test_create_invoice_handler_success():
+    callback = AsyncMock(spec=CallbackQuery)
+    callback.data = "buy:150"
+    callback.from_user = MagicMock()
+    callback.from_user.id = 123
+    callback.message = AsyncMock()
+    callback.message.edit_text = AsyncMock()
+    
+    db = AsyncMock()
+    crypto = AsyncMock()
+    crypto.create_invoice.return_value = {
+        "invoice_id": 999,
+        "pay_url": "https://pay.link"
+    }
+    
+    # Mock bot.dp.workflow_data
+    callback.bot.dp = MagicMock()
+    callback.bot.dp.workflow_data = {"crypto": crypto}
+    
+    await create_invoice_handler(callback, db)
+    
+    crypto.create_invoice.assert_called()
+    db.add_payment.assert_called_with(
+        telegram_id=123,
+        amount=150.0,
+        provider="CryptoBot",
+        external_id="999"
+    )
+    assert "Счет на 150.0 руб. создан" in callback.message.edit_text.call_args[0][0]

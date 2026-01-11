@@ -110,6 +110,14 @@ class DatabaseManager:
             row = await cursor.fetchone()
             return dict(row) if row else None
 
+    async def get_payment_by_external_id(self, external_id: str):
+        async with self.conn.execute(
+            "SELECT * FROM payments WHERE external_id = ?",
+            (external_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
     async def update_payment_status(self, payment_id: int, status: str):
         await self.conn.execute(
             "UPDATE payments SET status = ? WHERE id = ?",
