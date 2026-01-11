@@ -132,7 +132,7 @@ async def checkout_handler(callback: CallbackQuery, db: DatabaseManager, marzban
         if action == "buy":
             user_data = {
                 "username": marzban_username,
-                "proxies": {}, # Let Marzban enable default protocols
+                "proxies": {"vless": {}}, # Enable at least one proxy
                 "expire": int((datetime.now() + timedelta(days=days)).timestamp()),
                 "data_limit": 50 * 1024**3
             }
