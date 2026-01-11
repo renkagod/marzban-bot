@@ -11,7 +11,7 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Access Control & Dashboard' (Protocol in workflow.md)
 
 ## Phase 2: CryptoBot Integration
-- [ ] Task: CryptoBot API Client
+- [x] Task: CryptoBot API Client (2e7e125)
     - [ ] Sub-task: Implement a generic CryptoBot client supporting Mainnet and Testnet modes
     - [ ] Sub-task: Create logic for creating invoices based on selected top-up amount
 - [ ] Task: Payment Processing & Webhooks
