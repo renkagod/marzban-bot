@@ -114,10 +114,16 @@ async def my_subscription_handler(callback: CallbackQuery, db: DatabaseManager, 
         buttons = [[InlineKeyboardButton(text="Продлить подписку", callback_data="sub_plans:renew")]]
         
         if full_sub_url:
+            import urllib.parse
+            # Redirect URL using the bot's domain to bypass Telegram restrictions
+            base_redirect = f"{sub_prefix}/" if sub_prefix else "/"
+            v2ray_url = f"{sub_prefix}/?url=" + urllib.parse.quote(f"v2raytun://import/{full_sub_url}")
+            streisand_url = f"{sub_prefix}/?url=" + urllib.parse.quote(f"streisand://import/{full_sub_url}")
+            
             buttons.append([InlineKeyboardButton(text="Открыть в браузере", url=full_sub_url)])
             buttons.append([
-                InlineKeyboardButton(text="v2rayTun", url=f"v2raytun://import/{full_sub_url}"),
-                InlineKeyboardButton(text="Streisand", url=f"streisand://import/{full_sub_url}")
+                InlineKeyboardButton(text="v2rayTun", url=v2ray_url),
+                InlineKeyboardButton(text="Streisand", url=streisand_url)
             ])
             buttons.append([InlineKeyboardButton(text="Получить QR-код", callback_data=f"get_qr:{marzban_username}")])
         
@@ -125,23 +131,32 @@ async def my_subscription_handler(callback: CallbackQuery, db: DatabaseManager, 
         
         keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
         
-        if callback.message.photo:
-            await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
-            await callback.message.delete()
-        else:
-            await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+        try:
+            if callback.message.photo:
+                await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+                await callback.message.delete()
+            else:
+                await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+        except Exception as e:
+            if "message is not modified" not in str(e):
+                raise e
             
     except Exception as e:
         logger.error(f"Error in my_subscription_handler for {marzban_username}: {e}", exc_info=True)
-        await callback.message.edit_text(
+        error_text = (
             "У вас еще нет активной подписки или произошла ошибка при получении данных.\n\n"
-            "Если вы только что оплатили подписку, подождите несколько секунд и попробуйте снова.",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="Купить подписку", callback_data="sub_plans:buy")],
-                [InlineKeyboardButton(text="Обновить", callback_data="my_subscription")],
-                [InlineKeyboardButton(text="Назад", callback_data="back_to_main")]
-            ])
+            "Если вы только что оплатили подписку, подождите несколько секунд и попробуйте снова."
         )
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Купить подписку", callback_data="sub_plans:buy")],
+            [InlineKeyboardButton(text="Обновить", callback_data="my_subscription")],
+            [InlineKeyboardButton(text="Назад", callback_data="back_to_main")]
+        ])
+        try:
+            await callback.message.edit_text(error_text, reply_markup=keyboard)
+        except Exception as ex:
+            if "message is not modified" not in str(ex):
+                logger.error(f"Failed to send error message: {ex}")
 
 @router.callback_query(F.data.startswith("sub_plans:"))
 async def sub_plans_menu(callback: CallbackQuery, db: DatabaseManager):
