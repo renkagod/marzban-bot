@@ -13,7 +13,7 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Foundation & API' (Protocol in workflow.md)
 
 ## Phase 2: Bot Core & Admin Tools
-- [ ] Task: Bot Engine Implementation
+- [x] Task: Bot Engine Implementation (2fdb2ae)
     - [ ] Sub-task: Set up Aiogram dispatcher and basic handlers
     - [ ] Sub-task: Implement 'Failure Isolation' middleware to catch API errors
 - [ ] Task: Admin Group Management
