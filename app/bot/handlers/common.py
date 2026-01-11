@@ -89,15 +89,29 @@ async def sub_plans_menu(callback: CallbackQuery, db: DatabaseManager):
 
 async def process_subscription_action(user_id: int, action: str, days: int, marzban: MarzbanManager):
     marzban_username = f"user_{user_id}"
-    if action == "buy":
+    
+    # Try to determine if user exists first to decide action
+    user_exists = False
+    try:
+        await marzban.get_user(marzban_username)
+        user_exists = True
+    except Exception:
+        user_exists = False
+
+    if action == "buy" and not user_exists:
         limit_gb = int(os.getenv("DEFAULT_DATA_LIMIT_GB", "50"))
         data_limit = (limit_gb * 1024**3) if limit_gb > 0 else None
         user_data = {"username": marzban_username, "proxies": {"vless": {}}, "expire": int((datetime.now() + timedelta(days=days)).timestamp()), "data_limit": data_limit}
         await marzban.create_user(user_data)
     else:
-        m_user = await marzban.get_user(marzban_username)
-        start_date = max(m_user.expire if m_user.expire else int(datetime.now().timestamp()), int(datetime.now().timestamp()))
-        await marzban.modify_user(marzban_username, {"expire": start_date + (days * 24 * 3600)})
+        # Renew logic (also used as fallback if action was 'buy' but user exists)
+        try:
+            m_user = await marzban.get_user(marzban_username)
+            start_date = max(m_user.expire if m_user.expire else int(datetime.now().timestamp()), int(datetime.now().timestamp()))
+            await marzban.modify_user(marzban_username, {"expire": start_date + (days * 24 * 3600)})
+        except Exception as e:
+            # If even renewal fails (e.g. user was just deleted), throw it up
+            raise e
 
 @router.callback_query(F.data.startswith("checkout:"))
 async def checkout_handler(callback: CallbackQuery, db: DatabaseManager, marzban: MarzbanManager, crypto: CryptoBotClient):
