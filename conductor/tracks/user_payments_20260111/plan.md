@@ -4,7 +4,7 @@
 - [x] Task: Mandatory Channel Subscription (4012f2b)
     - [ ] Sub-task: Implement 'Registration' middleware/logic to check channel membership
     - [ ] Sub-task: Create a 'Join Channel' block with verification button
-- [ ] Task: User Dashboard implementation
+- [x] Task: User Dashboard implementation (a08c3ca)
     - [ ] Sub-task: Create main menu handler showing balance and group status
     - [ ] Sub-task: Implement 'My Subscription' view fetching real data from Marzban API
     - [ ] Sub-task: Add QR code generation for connection links
