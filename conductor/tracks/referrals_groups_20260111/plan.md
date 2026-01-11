@@ -1,11 +1,11 @@
-ο»Ώ# Track Plan: Referral System & Pricing Groups
+# Track Plan: Referral System & Pricing Groups
 
 ## Phase 1: Referral Logic
-- [ ] Task: Deep-linking & Tracking
+- [x] Task: Deep-linking & Tracking (a27032f)
     - [ ] Sub-task: Update /start handler to capture referrer ID from deep-links
     - [ ] Sub-task: Modify dd_user to store referral relationships
 - [ ] Task: Referral Cabinet
-    - [ ] Sub-task: Create a 'π‘« Π ΠµΡ„ΠµΡ€Π°Π»Ρ‹' menu showing stats and the referral link
+    - [ ] Sub-task: Create a '?? Πετεπΰλϋ' menu showing stats and the referral link
     - [ ] Sub-task: Implement a method to count successful invites
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Referral Logic' (Protocol in workflow.md)
 
