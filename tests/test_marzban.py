@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
 from app.core.marzban_client import MarzbanManager
 
 @pytest.fixture
@@ -15,53 +15,63 @@ def test_marzban_init(mock_marzban, config):
     manager = MarzbanManager(config["address"], config["username"], config["password"])
     assert manager.client is not None
     mock_marzban.assert_called_with(
-        address=config["address"],
-        username=config["username"],
-        password=config["password"]
+        base_url=config["address"]
     )
 
+@pytest.mark.asyncio
 @patch("app.core.marzban_client.MarzbanAPI")
-def test_marzban_connectivity_success(mock_marzban, config):
+async def test_marzban_connectivity_success(mock_marzban, config):
     mock_client = MagicMock()
     mock_marzban.return_value = mock_client
-    mock_client.get_system_stats.return_value = {"status": "running"}
+    # Mocking async methods
+    mock_client.get_token = AsyncMock(return_value=MagicMock(access_token="test_token"))
+    mock_client.get_system_stats = AsyncMock(return_value={"status": "running"})
     
     manager = MarzbanManager(config["address"], config["username"], config["password"])
-    assert manager.check_connectivity() is True
-    mock_client.get_system_stats.assert_called_once()
+    assert await manager.check_connectivity() is True
+    mock_client.get_token.assert_called_once_with(config["username"], config["password"])
+    mock_client.get_system_stats.assert_called_once_with(token="test_token")
 
+@pytest.mark.asyncio
 @patch("app.core.marzban_client.MarzbanAPI")
-def test_marzban_connectivity_failure(mock_marzban, config):
+async def test_marzban_connectivity_failure(mock_marzban, config):
     mock_client = MagicMock()
     mock_marzban.return_value = mock_client
-    mock_client.get_system_stats.side_effect = Exception("Connection error")
+    mock_client.get_token = AsyncMock(return_value=MagicMock(access_token="test_token"))
+    mock_client.get_system_stats = AsyncMock(side_effect=Exception("Connection error"))
     
     manager = MarzbanManager(config["address"], config["username"], config["password"])
-    assert manager.check_connectivity() is False
+    assert await manager.check_connectivity() is False
 
+@pytest.mark.asyncio
 @patch("app.core.marzban_client.MarzbanAPI")
-def test_get_stats(mock_marzban, config):
+async def test_get_stats(mock_marzban, config):
     mock_client = MagicMock()
     mock_marzban.return_value = mock_client
-    mock_client.get_system_stats.return_value = {"cpu": 10}
+    mock_client.get_token = AsyncMock(return_value="test_token")
+    mock_client.get_system_stats = AsyncMock(return_value={"cpu": 10})
     
-    manager = MarzbanManager(config["address"])
-    assert manager.get_stats() == {"cpu": 10}
+    manager = MarzbanManager(config["address"], config["username"], config["password"])
+    assert await manager.get_stats() == {"cpu": 10}
 
+@pytest.mark.asyncio
 @patch("app.core.marzban_client.MarzbanAPI")
-def test_get_user(mock_marzban, config):
+async def test_get_user(mock_marzban, config):
     mock_client = MagicMock()
     mock_marzban.return_value = mock_client
-    mock_client.get_user.return_value = {"username": "test"}
+    mock_client.get_token = AsyncMock(return_value="test_token")
+    mock_client.get_user = AsyncMock(return_value={"username": "test"})
     
-    manager = MarzbanManager(config["address"])
-    assert manager.get_user("test") == {"username": "test"}
+    manager = MarzbanManager(config["address"], config["username"], config["password"])
+    assert await manager.get_user("test") == {"username": "test"}
 
+@pytest.mark.asyncio
 @patch("app.core.marzban_client.MarzbanAPI")
-def test_create_user(mock_marzban, config):
+async def test_create_user(mock_marzban, config):
     mock_client = MagicMock()
     mock_marzban.return_value = mock_client
-    mock_client.add_user.return_value = {"username": "new"}
+    mock_client.get_token = AsyncMock(return_value="test_token")
+    mock_client.add_user = AsyncMock(return_value={"username": "new"})
     
-    manager = MarzbanManager(config["address"])
-    assert manager.create_user({"username": "new"}) == {"username": "new"}
+    manager = MarzbanManager(config["address"], config["username"], config["password"])
+    assert await manager.create_user({"username": "new"}) == {"username": "new"}
