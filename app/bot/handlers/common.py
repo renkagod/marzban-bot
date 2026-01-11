@@ -4,6 +4,7 @@ from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKe
 from app.core.database import DatabaseManager
 from app.core.marzban_client import MarzbanManager
 from app.core.cryptobot import CryptoBotClient
+from app.core.freekassa import FreeKassaClient
 from app.utils.qr import generate_qr_code
 from datetime import datetime, timedelta
 import os
@@ -224,21 +225,12 @@ async def checkout_handler(callback: CallbackQuery, db: DatabaseManager, marzban
             logger.error(f"Subscription action failed: {e}"); await callback.message.answer("Ошибка при обработке")
     else:
         needed = price - user['balance']
-        try:
-            asset = os.getenv("PAYMENT_ASSET", "USDT")
-            rates = await crypto.get_exchange_rates()
-            rate_obj = next((r for r in rates if r['source'] == asset and r['target'] == 'RUB'), None)
-            if not rate_obj: await callback.answer("Ошибка курса"); return
-            rate, markup = float(rate_obj['rate']), float(os.getenv("PAYMENT_MARKUP_PERCENT", "0")) / 100
-            amount_crypto = round((needed / rate) * (1 + markup), 2)
-            payload = f"sub_auto:{action}:{days}:{price}"
-            invoice = await crypto.create_invoice(amount=amount_crypto, asset=asset, description=f"Оплата подписки ({days} дн.)", payload=payload)
-            pay_url = invoice.get('bot_invoice_url') or invoice.get('pay_url') or invoice.get('url')
-            keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Оплатить", url=pay_url)], [InlineKeyboardButton(text="Проверить оплату", callback_data=f"check_pay:{invoice['invoice_id']}:{needed}")], [InlineKeyboardButton(text="Назад", callback_data="my_subscription")]])
-            await callback.message.edit_text(f"Недостаточно средств. Необходимо доплатить {needed} руб. (~{amount_crypto} {asset})\n\nПосле оплаты подписка будет активирована автоматически.", reply_markup=keyboard)
-            await db.add_payment(user_id, needed, "CryptoBot", str(invoice['invoice_id']))
-        except Exception as e:
-            logger.error(f"Error creating invoice: {e}"); await callback.answer("Ошибка счета")
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="CryptoBot (USDT/TON/...)", callback_data=f"pay:crypto:{action}:{days}:{price}:{needed}")],
+            [InlineKeyboardButton(text="FreeKassa (Карты/RU)", callback_data=f"pay:freekassa:{action}:{days}:{price}:{needed}")],
+            [InlineKeyboardButton(text="Назад", callback_data="my_subscription")]
+        ])
+        await callback.message.edit_text(f"Недостаточно средств. Необходимо доплатить {needed} руб.\n\nВыберите способ оплаты:", reply_markup=keyboard)
 
 @router.callback_query(F.data.startswith("check_pay:"))
 async def check_payment_handler(callback: CallbackQuery, db: DatabaseManager, bot: Bot, crypto: CryptoBotClient, marzban: MarzbanManager):
@@ -305,8 +297,64 @@ async def back_to_main_handler(callback: CallbackQuery, db: DatabaseManager):
     ])
     await callback.message.edit_text(text, reply_markup=keyboard)
 
-@router.callback_query(F.data == "support")
-async def support_handler(callback: CallbackQuery):
+@router.callback_query(F.data.startswith("pay:"))
+async def pay_handler(callback: CallbackQuery, db: DatabaseManager, crypto: CryptoBotClient, freekassa: FreeKassaClient):
+    parts = callback.data.split(":")
+    method, action, days, price, needed = parts[1], parts[2], int(parts[3]), int(parts[4]), float(parts[5])
+    user_id = callback.from_user.id
+    
+    if method == "crypto":
+        try:
+            asset = os.getenv("PAYMENT_ASSET", "USDT")
+            rates = await crypto.get_exchange_rates()
+            rate_obj = next((r for r in rates if r['source'] == asset and r['target'] == 'RUB'), None)
+            if not rate_obj: await callback.answer("Ошибка курса"); return
+            rate, markup = float(rate_obj['rate']), float(os.getenv("PAYMENT_MARKUP_PERCENT", "0")) / 100
+            amount_crypto = round((needed / rate) * (1 + markup), 2)
+            payload = f"sub_auto:{action}:{days}:{price}"
+            invoice = await crypto.create_invoice(amount=amount_crypto, asset=asset, description=f"Оплата подписки ({days} дн.)", payload=payload)
+            pay_url = invoice.get('bot_invoice_url') or invoice.get('pay_url') or invoice.get('url')
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="Оплатить", url=pay_url)],
+                [InlineKeyboardButton(text="Проверить оплату", callback_data=f"check_pay:{invoice['invoice_id']}:{needed}")],
+                [InlineKeyboardButton(text="Назад", callback_data="my_subscription")]
+            ])
+            await callback.message.edit_text(f"К оплате: ~{amount_crypto} {asset}\n\nПосле оплаты подписка будет активирована автоматически.", reply_markup=keyboard)
+            await db.add_payment(user_id, needed, "CryptoBot", str(invoice['invoice_id']))
+        except Exception as e:
+            logger.error(f"Error creating CryptoBot invoice: {e}"); await callback.answer("Ошибка счета")
+            
+    elif method == "freekassa":
+        try:
+            # Generate a unique order ID for FreeKassa
+            payment_id = await db.add_payment(user_id, needed, "FreeKassa", "temp")
+            order_id = f"FK_{payment_id}_{user_id}"
+            await db.conn.execute("UPDATE payments SET external_id = ? WHERE id = ?", (order_id, payment_id))
+            await db.conn.commit()
+            
+            pay_url = freekassa.generate_payment_link(needed, order_id)
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="Оплатить картой", url=pay_url)],
+                [InlineKeyboardButton(text="Проверить оплату", callback_data=f"check_pay_fk:{payment_id}")],
+                [InlineKeyboardButton(text="Назад", callback_data="my_subscription")]
+            ])
+            await callback.message.edit_text(
+                f"К оплате: {needed} руб.\n\n"
+                "После оплаты нажмите кнопку 'Проверить оплату'.\n"
+                "Внимание: FreeKassa может обрабатывать платеж до 5 минут.",
+                reply_markup=keyboard
+            )
+        except Exception as e:
+            logger.error(f"Error creating FreeKassa invoice: {e}"); await callback.answer("Ошибка счета")
+
+@router.callback_query(F.data.startswith("check_pay_fk:"))
+async def check_payment_fk_handler(callback: CallbackQuery, db: DatabaseManager, bot: Bot, marzban: MarzbanManager):
+    # Since we don't have a reliable polling API for SCI FreeKassa without advanced API keys,
+    # we usually rely on webhooks. However, for a simple manual check, we can't do much 
+    # unless we use their API. For now, we'll inform the user that we are waiting for webhook
+    # or implement a simple check if the user provides the transaction ID.
+    # ALTERNATIVE: Use the webhook approach.
+    await callback.answer("Ожидаем подтверждения от платежной системы. Обычно это занимает 1-5 минут.", show_alert=True)
     support_user = os.getenv("SUPPORT_USERNAME", "@renkaa1")
     await callback.message.answer(f"Для связи с поддержкой напишите {support_user}")
     await callback.answer()
