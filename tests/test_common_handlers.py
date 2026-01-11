@@ -18,6 +18,25 @@ async def test_start_cmd():
     message.answer.assert_called()
     assert "Привет, Test User" in message.answer.call_args[0][0]
     assert "Баланс:</b> 0.0" in message.answer.call_args[0][0]
+    assert "Standard" not in message.answer.call_args[0][0] # Should be hidden
+
+@pytest.mark.asyncio
+async def test_my_subscription_handler_not_found():
+    callback = AsyncMock(spec=CallbackQuery)
+    callback.from_user = MagicMock()
+    callback.from_user.id = 123
+    callback.message = AsyncMock()
+    callback.message.edit_text = AsyncMock()
+    
+    db = AsyncMock()
+    marzban = AsyncMock()
+    marzban.get_user.side_effect = Exception("Not found")
+    
+    from app.bot.handlers.common import my_subscription_handler
+    await my_subscription_handler(callback, db, marzban)
+    
+    callback.message.edit_text.assert_called()
+    assert "Купить подписку" in callback.message.edit_text.call_args[1]['reply_markup'].inline_keyboard[0][0].text
 
 @pytest.mark.asyncio
 async def test_check_subscription_handler_success():
@@ -84,7 +103,8 @@ async def test_my_subscription_handler_success():
     
     # Check button URL
     kb = kwargs['reply_markup']
-    assert kb.inline_keyboard[0][0].url == "https://vpn.lol/sub/test"
+    # Button index 1 is Link (index 0 is Renew)
+    assert kb.inline_keyboard[1][0].url == "https://vpn.lol/sub/test"
 
 @pytest.mark.asyncio
 async def test_support_handler():
@@ -131,7 +151,7 @@ async def test_top_up_menu():
     
     callback.message.edit_text.assert_called()
     assert "150 руб." in callback.message.edit_text.call_args[0][0]
-    assert "Inner Circle" in callback.message.edit_text.call_args[0][0]
+    assert "Inner Circle" not in callback.message.edit_text.call_args[0][0] # Hidden
 
 @pytest.mark.asyncio
 async def test_create_invoice_handler_success():
@@ -155,10 +175,10 @@ async def test_create_invoice_handler_success():
     
     crypto.create_invoice.assert_called()
     db.add_payment.assert_called_with(
-        telegram_id=123,
-        amount=150.0,
-        provider="CryptoBot",
-        external_id="999"
+        123,
+        150.0,
+        "CryptoBot",
+        "999"
     )
     assert "Счет на 150.0 руб." in callback.message.edit_text.call_args[0][0]
     assert "USDT) создан" in callback.message.edit_text.call_args[0][0]

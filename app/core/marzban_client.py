@@ -41,3 +41,8 @@ class MarzbanManager:
         """Создает пользователя."""
         await self._ensure_token()
         return await self.client.add_user(user_dict, token=self.token)
+
+    async def modify_user(self, username: str, user_dict: dict):
+        """Изменяет данные пользователя (например, продление)."""
+        await self._ensure_token()
+        return await self.client.modify_user(username, user_dict, token=self.token)
