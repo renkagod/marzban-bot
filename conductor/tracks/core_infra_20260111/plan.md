@@ -4,7 +4,7 @@
 - [x] Task: Project Initialization (55177b0)
     - [ ] Sub-task: Create directory structure and pyproject.toml/requirements.txt
     - [ ] Sub-task: Configure environment variables (.env) for Bot Token and Marzban credentials
-- [ ] Task: Database Setup
+- [x] Task: Database Setup (ce12afd)
     - [ ] Sub-task: Design and implement SQLite schema using aiosqlite
     - [ ] Sub-task: Create database manager for CRUD operations on users and groups
 - [ ] Task: Marzban API Integration
