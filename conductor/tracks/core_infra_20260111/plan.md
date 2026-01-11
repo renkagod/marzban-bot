@@ -19,7 +19,7 @@
 - [x] Task: Admin Group Management (8ba98df)
     - [ ] Sub-task: Create admin-only command to manage 'Inner Circle' members
     - [ ] Sub-task: Implement interactive menus for selecting and tagging users
-- [ ] Task: Health Monitoring Service
+- [x] Task: Health Monitoring Service (9af6d02)
     - [ ] Sub-task: Implement background task for periodic server status checks
     - [ ] Sub-task: Configure alert forwarding to the designated admin channel topic
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Bot Core & Admin Tools' (Protocol in workflow.md)
