@@ -14,7 +14,7 @@
 - [x] Task: CryptoBot API Client (2e7e125)
     - [ ] Sub-task: Implement a generic CryptoBot client supporting Mainnet and Testnet modes
     - [ ] Sub-task: Create logic for creating invoices based on selected top-up amount
-- [ ] Task: Payment Processing & Webhooks
+- [x] Task: Payment Processing & Webhooks (77aac0b)
     - [ ] Sub-task: Implement a polling task or webhook handler for payment verification
     - [ ] Sub-task: Update user balance and log payment in the database upon success
     - [ ] Sub-task: Send confirmation notifications to user and admin channel topic
