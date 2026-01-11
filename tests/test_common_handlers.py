@@ -137,11 +137,8 @@ async def test_create_invoice_handler_success():
         "pay_url": "https://pay.link"
     }
     
-    # Mock bot.dp.workflow_data
-    callback.bot.dp = MagicMock()
-    callback.bot.dp.workflow_data = {"crypto": crypto}
-    
-    await create_invoice_handler(callback, db)
+    # No need to mock bot.dp anymore as it's passed directly
+    await create_invoice_handler(callback, db, crypto)
     
     crypto.create_invoice.assert_called()
     db.add_payment.assert_called_with(

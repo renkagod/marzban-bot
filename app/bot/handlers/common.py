@@ -30,26 +30,13 @@ async def top_up_menu(callback: CallbackQuery):
     await callback.message.edit_text("Выберите сумму пополнения:", reply_markup=keyboard)
 
 @router.callback_query(F.data.startswith("buy:"))
-async def create_invoice_handler(callback: CallbackQuery, db: DatabaseManager):
+async def create_invoice_handler(callback: CallbackQuery, db: DatabaseManager, crypto: CryptoBotClient):
     amount_rub = float(callback.data.split(":")[1])
     
-    # Initialize CryptoBot (get from DP or env)
-    # For now, we'll assume it's in DP or we'll use a factory
-    # In main.py we'll add it to DP
-    crypto: CryptoBotClient = callback.bot.dp.workflow_data.get("crypto")
-    if not crypto:
-        # Fallback for manual testing or if not in DP yet
-        crypto = CryptoBotClient(os.getenv("CRYPTOBOT_TOKEN"), testnet=os.getenv("CRYPTOBOT_TESTNET", "False").lower() == "true")
-
     try:
-        # Convert RUB to USDT or other asset if needed
-        # For simplicity, we'll just pass the amount as is if the user wants USDT = RUB (unlikely)
-        # Usually we need a converter. Let's assume we use USDT and fix rate for now
-        # OR better: CryptoBot supports fiat currency in createInvoice
-        
         invoice = await crypto.create_invoice(
             amount=amount_rub, 
-            asset="USDT", # Or dynamic
+            asset="USDT",
             description=f"Пополнение баланса на {amount_rub} руб.",
             payload=str(callback.from_user.id)
         )
@@ -79,12 +66,9 @@ async def create_invoice_handler(callback: CallbackQuery, db: DatabaseManager):
         await callback.answer("Ошибка при создании счета. Попробуйте позже.", show_alert=True)
 
 @router.callback_query(F.data.startswith("check_pay:"))
-async def check_payment_handler(callback: CallbackQuery, db: DatabaseManager, bot: Bot):
+async def check_payment_handler(callback: CallbackQuery, db: DatabaseManager, bot: Bot, crypto: CryptoBotClient):
     invoice_id = int(callback.data.split(":")[1])
-    crypto: CryptoBotClient = callback.bot.dp.workflow_data.get("crypto")
-    if not crypto:
-        crypto = CryptoBotClient(os.getenv("CRYPTOBOT_TOKEN"), testnet=os.getenv("CRYPTOBOT_TESTNET", "False").lower() == "true")
-
+    
     try:
         invoices = await crypto.get_invoices(invoice_ids=[invoice_id])
         # get_invoices returns a list or dict with items
