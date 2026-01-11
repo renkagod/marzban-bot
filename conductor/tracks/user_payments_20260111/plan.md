@@ -1,7 +1,7 @@
-﻿# Track Plan: User Subscription & Payments
+# Track Plan: User Subscription & Payments
 
 ## Phase 1: Access Control & Dashboard
-- [ ] Task: Mandatory Channel Subscription
+- [x] Task: Mandatory Channel Subscription (4012f2b)
     - [ ] Sub-task: Implement 'Registration' middleware/logic to check channel membership
     - [ ] Sub-task: Create a 'Join Channel' block with verification button
 - [ ] Task: User Dashboard implementation
