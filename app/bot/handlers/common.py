@@ -20,14 +20,31 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 @router.callback_query(F.data == "top_up")
-async def top_up_menu(callback: CallbackQuery):
+async def top_up_menu(callback: CallbackQuery, db: DatabaseManager):
+    user = await db.get_user(callback.from_user.id)
+    
+    # Get prices from env
+    price_standard = int(os.getenv("PRICE_STANDARD", "200"))
+    price_inner = int(os.getenv("PRICE_INNER_CIRCLE", "150"))
+    
+    # Determine which price to show based on group
+    primary_price = price_inner if user['group_name'] == "Inner Circle" else price_standard
+    
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="150 руб.", callback_data="buy:150")],
-        [InlineKeyboardButton(text="200 руб.", callback_data="buy:200")],
+        [InlineKeyboardButton(text=f"{primary_price} руб. (Тариф {user['group_name']})", callback_data=f"buy:{primary_price}")],
         [InlineKeyboardButton(text="500 руб.", callback_data="buy:500")],
+        [InlineKeyboardButton(text="1000 руб.", callback_data="buy:1000")],
         [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")]
     ])
-    await callback.message.edit_text("Выберите сумму пополнения:", reply_markup=keyboard)
+    
+    text = (
+        f"<b>💳 Пополнение баланса</b>\n\n"
+        f"Ваш текущий тариф: <b>{user['group_name']}</b>\n"
+        f"Сумма к оплате: <b>{primary_price} руб.</b>\n\n"
+        "Выберите сумму или воспользуйтесь кнопками ниже:"
+    )
+    
+    await callback.message.edit_text(text, reply_markup=keyboard)
 
 @router.callback_query(F.data.startswith("buy:"))
 async def create_invoice_handler(callback: CallbackQuery, db: DatabaseManager, crypto: CryptoBotClient):

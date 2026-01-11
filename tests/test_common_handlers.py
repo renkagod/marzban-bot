@@ -118,12 +118,20 @@ async def test_get_qr_handler_success():
 @pytest.mark.asyncio
 async def test_top_up_menu():
     callback = AsyncMock(spec=CallbackQuery)
+    callback.from_user = MagicMock()
+    callback.from_user.id = 123
     callback.message = AsyncMock()
     callback.message.edit_text = AsyncMock()
     
-    await top_up_menu(callback)
+    db = AsyncMock()
+    db.get_user.return_value = {"telegram_id": 123, "group_name": "Inner Circle"}
+    
+    with patch('os.getenv', side_effect=lambda k, d=None: "150" if k == "PRICE_INNER_CIRCLE" else d):
+        await top_up_menu(callback, db)
+    
     callback.message.edit_text.assert_called()
-    assert "Выберите сумму" in callback.message.edit_text.call_args[0][0]
+    assert "150 руб." in callback.message.edit_text.call_args[0][0]
+    assert "Inner Circle" in callback.message.edit_text.call_args[0][0]
 
 @pytest.mark.asyncio
 async def test_create_invoice_handler_success():
