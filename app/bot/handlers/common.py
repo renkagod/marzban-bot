@@ -136,6 +136,8 @@ async def checkout_handler(callback: CallbackQuery, db: DatabaseManager, marzban
                 "expire": int((datetime.now() + timedelta(days=days)).timestamp()),
                 "data_limit": 50 * 1024**3
             }
+            # Many Marzban versions require explicitly defining empty dicts or specific config
+            # Let's try to pass it simply first, but ensuring it matches UserCreate model
             await marzban.create_user(user_data)
         else:
             m_user = await marzban.get_user(marzban_username)
@@ -178,8 +180,11 @@ async def create_invoice_handler(callback: CallbackQuery, db: DatabaseManager, c
         amount_usdt = round((amount_rub / usdt_rub_rate) * (1 + markup), 2)
         invoice = await crypto.create_invoice(amount=amount_usdt, asset="USDT", description=f"Пополнение на {amount_rub} руб.", payload=str(callback.from_user.id))
         
+        # Use bot_invoice_url instead of pay_url
+        pay_url = invoice.get('bot_invoice_url') or invoice.get('pay_url') or invoice.get('url')
+
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="💳 Оплатить", url=invoice['pay_url'])],
+            [InlineKeyboardButton(text="💳 Оплатить", url=pay_url)],
             [InlineKeyboardButton(text="✅ Проверить оплату", callback_data=f"check_pay:{invoice['invoice_id']}:{amount_rub}")],
             [InlineKeyboardButton(text="🔙 Назад", callback_data="top_up")]
         ])
