@@ -1,0 +1,8 @@
+aiogram>=3.0.0
+marzban
+aiosqlite
+qrcode[pil]
+python-dotenv
+pytest
+pytest-asyncio
+pytest-cov
