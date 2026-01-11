@@ -11,3 +11,8 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ## [x] Track: User Subscription & Payments
 *Link: [./conductor/tracks/user_payments_20260111/](./conductor/tracks/user_payments_20260111/)*
+
+---
+
+## [ ] Track: Referral System & Pricing Groups
+*Link: [./conductor/tracks/referrals_groups_20260111/](./conductor/tracks/referrals_groups_20260111/)*
