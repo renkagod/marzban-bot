@@ -1,6 +1,6 @@
 from aiogram import Router, F, Bot
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton, User
 from app.core.database import DatabaseManager
 from app.core.marzban_client import MarzbanManager
 from app.core.cryptobot import CryptoBotClient
@@ -55,7 +55,10 @@ async def referral_menu(callback: CallbackQuery, db: DatabaseManager):
 @router.callback_query(F.data == "my_subscription")
 async def my_subscription_handler(callback: CallbackQuery, db: DatabaseManager, marzban: MarzbanManager):
     prefix = os.getenv("MARZBAN_USER_PREFIX", "user_")
-    marzban_username = f"{prefix}{callback.from_user.id}"
+    tg_name = callback.from_user.username or callback.from_user.first_name
+    clean_name = "".join(c for c in tg_name.lower() if c.isalnum() or c == "_")
+    marzban_username = f"{callback.from_user.id}_{clean_name}"
+    
     try:
         m_user = await marzban.get_user(marzban_username)
         sub_prefix = os.getenv("SUB_URL_PREFIX", "").rstrip("/")
@@ -88,29 +91,29 @@ async def sub_plans_menu(callback: CallbackQuery, db: DatabaseManager):
     title = "Продление подписки" if action == "renew" else "Покупка подписки"
     await callback.message.edit_text(f"<b>{title}</b>\n\nВыберите период:", reply_markup=keyboard)
 
-async def process_subscription_action(user_id: int, action: str, days: int, marzban: MarzbanManager):
-    prefix = os.getenv("MARZBAN_USER_PREFIX", "user_")
-    marzban_username = f"{prefix}{user_id}"
-    
+async def process_subscription_action(user_id: int, action: str, days: int, marzban: MarzbanManager, event_from_user: User):
+    tg_name = event_from_user.username or event_from_user.first_name
+    clean_name = "".join(c for c in tg_name.lower() if c.isalnum() or c == "_")
+    marzban_username = f"{user_id}_{clean_name}"
+    user_note = f"TG ID: {user_id}"
+    if event_from_user.username: user_note += f" | @{event_from_user.username}"
+    user_note += f" | {event_from_user.full_name}"
     user_exists = False
     try:
         await marzban.get_user(marzban_username)
         user_exists = True
-    except Exception:
-        user_exists = False
-
+    except Exception: user_exists = False
     if action == "buy" and not user_exists:
         limit_gb = int(os.getenv("DEFAULT_DATA_LIMIT_GB", "50"))
         data_limit = (limit_gb * 1024**3) if limit_gb > 0 else None
-        user_data = {"username": marzban_username, "proxies": {"vless": {}}, "expire": int((datetime.now() + timedelta(days=days)).timestamp()), "data_limit": data_limit}
+        user_data = {"username": marzban_username, "proxies": {"vless": {}}, "expire": int((datetime.now() + timedelta(days=days)).timestamp()), "data_limit": data_limit, "note": user_note}
         await marzban.create_user(user_data)
     else:
         try:
             m_user = await marzban.get_user(marzban_username)
             start_date = max(m_user.expire if m_user.expire else int(datetime.now().timestamp()), int(datetime.now().timestamp()))
             await marzban.modify_user(marzban_username, {"expire": start_date + (days * 24 * 3600)})
-        except Exception as e:
-            raise e
+        except Exception as e: raise e
 
 @router.callback_query(F.data.startswith("checkout:"))
 async def checkout_handler(callback: CallbackQuery, db: DatabaseManager, marzban: MarzbanManager, crypto: CryptoBotClient):
@@ -119,7 +122,7 @@ async def checkout_handler(callback: CallbackQuery, db: DatabaseManager, marzban
     user = await db.get_user(user_id)
     if user['balance'] >= price:
         try:
-            await process_subscription_action(user_id, action, days, marzban)
+            await process_subscription_action(user_id, action, days, marzban, callback.from_user)
             await db.update_balance(user_id, -float(price))
             await callback.answer("Успешно")
             await my_subscription_handler(callback, db, marzban)
@@ -131,12 +134,8 @@ async def checkout_handler(callback: CallbackQuery, db: DatabaseManager, marzban
             asset = os.getenv("PAYMENT_ASSET", "USDT")
             rates = await crypto.get_exchange_rates()
             rate_obj = next((r for r in rates if r['source'] == asset and r['target'] == 'RUB'), None)
-            if not rate_obj:
-                await callback.answer("Ошибка получения курса валют")
-                return
-            
-            rate = float(rate_obj['rate'])
-            markup = float(os.getenv("PAYMENT_MARKUP_PERCENT", "0")) / 100
+            if not rate_obj: await callback.answer("Ошибка курса"); return
+            rate, markup = float(rate_obj['rate']), float(os.getenv("PAYMENT_MARKUP_PERCENT", "0")) / 100
             amount_crypto = round((needed / rate) * (1 + markup), 2)
             payload = f"sub_auto:{action}:{days}:{price}"
             invoice = await crypto.create_invoice(amount=amount_crypto, asset=asset, description=f"Оплата подписки ({days} дн.)", payload=payload)
@@ -166,27 +165,23 @@ async def check_payment_handler(callback: CallbackQuery, db: DatabaseManager, bo
                     days, price = int(days), int(price)
                     user = await db.get_user(callback.from_user.id)
                     if user['balance'] >= price:
-                        await process_subscription_action(callback.from_user.id, action, days, marzban)
+                        await process_subscription_action(callback.from_user.id, action, days, marzban, callback.from_user)
                         await db.update_balance(callback.from_user.id, -float(price))
                         await callback.message.answer("Оплата подтверждена, подписка активирована")
-                    else:
-                        await callback.message.answer("Оплата подтверждена, баланс пополнен")
-                else:
-                    await callback.message.edit_text("Оплата подтверждена")
+                    else: await callback.message.answer("Оплата подтверждена, баланс пополнен")
+                else: await callback.message.edit_text("Оплата подтверждена")
                 await bot.send_message(os.getenv("ADMIN_CHANNEL_ID"), f"Новая оплата\n\nПользователь: {callback.from_user.mention_html()}\nСумма: {db_p['amount']} руб.", message_thread_id=os.getenv("ADMIN_PAYMENTS_TOPIC_ID"))
                 await my_subscription_handler(callback, db, marzban)
-            else:
-                await callback.answer("Уже обработано")
-        else:
-            await callback.answer("Оплата не найдена")
+            else: await callback.answer("Уже обработано")
+        else: await callback.answer("Оплата не найдена")
     except Exception as e:
         logger.error(f"Error checking payment: {e}"); await callback.answer("Ошибка проверки")
 
 @router.callback_query(F.data.startswith("get_qr:"))
 async def get_qr_handler(callback: CallbackQuery, marzban: MarzbanManager):
-    user_name = callback.data.split(":")[1]
+    marzban_username = callback.data.split(":")[1]
     try:
-        m_user = await marzban.get_user(user_name)
+        m_user = await marzban.get_user(marzban_username)
         await callback.message.answer_photo(photo=generate_qr_code(m_user.subscription_url), caption=f"Ваш QR-код (<code>{m_user.username}</code>)")
         await callback.answer()
     except Exception as e:
@@ -219,7 +214,6 @@ async def check_subscription_handler(callback: CallbackQuery, db: DatabaseManage
             text = f"Привет, {callback.from_user.full_name}!\n\nБаланс: {user['balance']} руб.\n\nВыберите действие:"
             keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Подписка", callback_data="my_subscription")], [InlineKeyboardButton(text="Пригласить друзей", callback_data="referrals")], [InlineKeyboardButton(text="Поддержка", callback_data="support")]])
             await callback.message.answer(text, reply_markup=keyboard)
-        else:
-            await callback.answer("Вы не подписаны на канал")
+        else: await callback.answer("Вы не подписаны на канал")
     except Exception as e:
         logger.error(f"Error checking sub: {e}"); await callback.answer("Ошибка")

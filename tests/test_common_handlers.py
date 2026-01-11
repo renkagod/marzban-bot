@@ -63,6 +63,7 @@ async def test_my_subscription_handler_success():
     callback = AsyncMock(spec=CallbackQuery)
     callback.from_user = MagicMock()
     callback.from_user.id = 123
+    callback.from_user.username = "testuser"
     callback.message = AsyncMock()
     callback.message.edit_text = AsyncMock()
     callback.answer = AsyncMock()
@@ -71,7 +72,7 @@ async def test_my_subscription_handler_success():
     marzban = AsyncMock()
     # Mock Marzban user response
     m_user = MagicMock()
-    m_user.username = "user_123"
+    m_user.username = "123_testuser"
     m_user.status = "active"
     m_user.used_traffic = 1024**3
     m_user.data_limit = 5 * 1024**3
@@ -99,20 +100,21 @@ async def test_support_handler():
     callback.message.answer = AsyncMock()
     callback.answer = AsyncMock()
     
-    await support_handler(callback)
-    callback.message.answer.assert_called_with("Для связи с поддержкой напишите @renkaa1")
+    with patch('os.getenv', return_value="@admin"):
+        await support_handler(callback)
+    callback.message.answer.assert_called_with("Для связи с поддержкой напишите @admin")
 
 @pytest.mark.asyncio
 async def test_get_qr_handler_success():
     callback = AsyncMock(spec=CallbackQuery)
-    callback.data = "get_qr:user_123"
+    callback.data = "get_qr:123_test"
     callback.message = AsyncMock()
     callback.message.answer_photo = AsyncMock()
     callback.answer = AsyncMock()
     
     marzban = AsyncMock()
     m_user = MagicMock()
-    m_user.username = "user_123"
+    m_user.username = "123_test"
     m_user.subscription_url = "https://link.com"
     marzban.get_user.return_value = m_user
     
@@ -120,7 +122,7 @@ async def test_get_qr_handler_success():
     
     callback.message.answer_photo.assert_called()
     args, kwargs = callback.message.answer_photo.call_args
-    assert "user_123" in kwargs['caption']
+    assert "123_test" in kwargs['caption']
     callback.answer.assert_called_once()
 
 @pytest.mark.asyncio
@@ -145,27 +147,55 @@ async def test_referral_menu():
     assert "start=123" in args[0]
 
 @pytest.mark.asyncio
+
 async def test_checkout_handler_top_up():
+
     callback = AsyncMock(spec=CallbackQuery)
+
     callback.data = "checkout:buy:7:50"
+
     callback.from_user = MagicMock()
+
     callback.from_user.id = 123
+
+    callback.from_user.username = "testuser"
+
     callback.message = AsyncMock()
+
     callback.message.edit_text = AsyncMock()
+
     
+
     db = AsyncMock()
+
     db.get_user.return_value = {"telegram_id": 123, "balance": 0.0} # Low balance
+
     
+
     crypto = AsyncMock()
+
     crypto.get_exchange_rates.return_value = [{"source": "USDT", "target": "RUB", "rate": "100.0"}]
+
     crypto.create_invoice.return_value = {
+
         "invoice_id": 999,
+
         "pay_url": "https://pay.link"
+
     }
+
     
+
     marzban = AsyncMock()
+
     
-    await checkout_handler(callback, db, marzban, crypto)
+
+    with patch('os.getenv', side_effect=lambda k, d=None: "USDT" if k == "PAYMENT_ASSET" else d):
+
+        await checkout_handler(callback, db, marzban, crypto)
+
     
+
     crypto.create_invoice.assert_called()
+
     assert "Недостаточно средств" in callback.message.edit_text.call_args[0][0]
