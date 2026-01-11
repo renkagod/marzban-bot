@@ -33,8 +33,17 @@ class SubscriptionMiddleware(BaseMiddleware):
         try:
             member = await event.bot.get_chat_member(chat_id=self.channel_id, user_id=user_id)
             if member.status in ["member", "administrator", "creator"]:
+                # Capture referrer if present in /start command
+                referred_by = None
+                if event.text and event.text.startswith("/start "):
+                    parts = event.text.split()
+                    if len(parts) > 1 and parts[1].isdigit():
+                        referred_by = int(parts[1])
+                        if referred_by == user_id: # Prevent self-referral
+                            referred_by = None
+
                 # Register user in DB upon successful subscription check
-                await db.add_user(user_id, event.from_user.username)
+                await db.add_user(user_id, event.from_user.username, referred_by=referred_by)
                 return await handler(event, data)
         except Exception as e:
             logger.error(f"Error checking subscription: {e}")

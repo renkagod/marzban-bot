@@ -43,6 +43,15 @@ async def test_balance_update(db):
     assert user['balance'] == 500.0
 
 @pytest.mark.asyncio
+async def test_referral_tracking(db):
+    await db.add_user(1, "referrer")
+    await db.add_user(2, "referee1", referred_by=1)
+    await db.add_user(3, "referee2", referred_by=1)
+    
+    count = await db.get_referral_count(1)
+    assert count == 2
+
+@pytest.mark.asyncio
 async def test_list_users(db):
     await db.add_user(1, "user1")
     await db.add_user(2, "user2")

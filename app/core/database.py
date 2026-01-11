@@ -80,6 +80,14 @@ class DatabaseManager:
         )
         await self.conn.commit()
 
+    async def get_referral_count(self, telegram_id: int) -> int:
+        async with self.conn.execute(
+            "SELECT COUNT(*) FROM users WHERE referred_by = ?",
+            (telegram_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else 0
+
     async def get_all_users(self):
         async with self.conn.execute("SELECT * FROM users") as cursor:
             rows = await cursor.fetchall()
