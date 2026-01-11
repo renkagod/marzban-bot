@@ -37,16 +37,34 @@ class MarzbanManager:
         await self._ensure_token()
         return await self.client.get_user(username, token=self.token)
 
+    async def _request(self, method: str, endpoint: str, **kwargs):
+        try:
+            # This is a hypothetical internal helper, but since we use self.client directly,
+            # we need to catch the exception where it's called.
+            pass
+        except Exception as e:
+            if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                logger.error(f"Marzban API Detail Error: {e.response.text}")
+            raise e
+
     async def create_user(self, user_dict: dict):
         """Создает пользователя."""
         await self._ensure_token()
-        # Превращаем словарь в объект UserCreate
         user_obj = UserCreate(**user_dict)
-        return await self.client.add_user(user_obj, token=self.token)
+        try:
+            return await self.client.add_user(user_obj, token=self.token)
+        except Exception as e:
+            if hasattr(e, 'response'):
+                logger.error(f"Marzban API Error Body: {e.response.text}")
+            raise e
 
     async def modify_user(self, username: str, user_dict: dict):
         """Изменяет данные пользователя (например, продление)."""
         await self._ensure_token()
-        # Превращаем словарь в объект UserModify
         user_obj = UserModify(**user_dict)
-        return await self.client.modify_user(username, user_obj, token=self.token)
+        try:
+            return await self.client.modify_user(username, user_obj, token=self.token)
+        except Exception as e:
+            if hasattr(e, 'response'):
+                logger.error(f"Marzban API Error Body: {e.response.text}")
+            raise e
