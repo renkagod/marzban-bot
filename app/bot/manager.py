@@ -2,8 +2,10 @@ from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from app.bot.middlewares.error_handler import ErrorHandlerMiddleware
-from app.bot.handlers import admin
+from app.bot.middlewares.subscription import SubscriptionMiddleware
+from app.bot.handlers import admin, common
 import logging
+import os
 
 class BotManager:
     def __init__(self, token: str):
@@ -17,10 +19,15 @@ class BotManager:
 
     def _setup_routers(self):
         self.dp.include_router(admin.router)
+        self.dp.include_router(common.router)
 
     def _setup_middlewares(self):
         self.dp.message.middleware(ErrorHandlerMiddleware())
         self.dp.callback_query.middleware(ErrorHandlerMiddleware())
+        
+        channel_id = os.getenv("CHANNEL_ID")
+        if channel_id:
+            self.dp.message.middleware(SubscriptionMiddleware(channel_id))
 
     async def start(self):
         logging.info("Starting bot...")

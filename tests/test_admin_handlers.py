@@ -6,21 +6,27 @@ from aiogram.types import Message, CallbackQuery
 @pytest.mark.asyncio
 async def test_admin_menu_no_users():
     message = AsyncMock(spec=Message)
+    message.from_user = MagicMock()
+    message.from_user.id = 123
     message.answer = AsyncMock() # Explicitly make it AsyncMock
     db = AsyncMock()
     db.get_all_users.return_value = []
     
-    await admin_menu(message, db)
+    with patch('os.getenv', return_value="123"):
+        await admin_menu(message, db)
     message.answer.assert_called_with("Пользователей пока нет.")
 
 @pytest.mark.asyncio
 async def test_admin_menu_with_users():
     message = AsyncMock(spec=Message)
+    message.from_user = MagicMock()
+    message.from_user.id = 123
     message.answer = AsyncMock()
     db = AsyncMock()
     db.get_all_users.return_value = [{"telegram_id": 123, "username": "test", "group_name": "Standard"}]
     
-    await admin_menu(message, db)
+    with patch('os.getenv', return_value="123"):
+        await admin_menu(message, db)
     assert message.answer.called
     args, kwargs = message.answer.call_args
     assert "Выберите пользователя" in args[0]
