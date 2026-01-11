@@ -21,12 +21,19 @@ class DatabaseManager:
                 CREATE TABLE IF NOT EXISTS users (
                     telegram_id INTEGER PRIMARY KEY,
                     username TEXT,
+                    marzban_username TEXT,
                     group_name TEXT DEFAULT 'Standard',
                     balance REAL DEFAULT 0.0,
                     referred_by INTEGER,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
+            # Check if marzban_username column exists (for migrations)
+            try:
+                await cursor.execute("ALTER TABLE users ADD COLUMN marzban_username TEXT")
+            except Exception:
+                pass # Column already exists
+
             # Payments table
             await cursor.execute('''
                 CREATE TABLE IF NOT EXISTS payments (
@@ -57,6 +64,13 @@ class DatabaseManager:
             (telegram_id, username, referred_by)
         ) as cursor:
             await self.conn.commit()
+
+    async def update_marzban_username(self, telegram_id: int, marzban_username: str):
+        await self.conn.execute(
+            "UPDATE users SET marzban_username = ? WHERE telegram_id = ?",
+            (marzban_username, telegram_id)
+        )
+        await self.conn.commit()
 
     async def get_user(self, telegram_id: int):
         async with self.conn.execute(

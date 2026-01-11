@@ -78,3 +78,11 @@ async def test_payment_recording(db):
     await db.update_payment_status(payment_id, "completed")
     payment = await db.get_payment(payment_id)
     assert payment['status'] == "completed"
+
+@pytest.mark.asyncio
+async def test_marzban_username(db):
+    user_id = 999
+    await db.add_user(user_id, "test")
+    await db.update_marzban_username(user_id, "999_custom")
+    user = await db.get_user(user_id)
+    assert user['marzban_username'] == "999_custom"

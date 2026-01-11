@@ -52,29 +52,95 @@ async def referral_menu(callback: CallbackQuery, db: DatabaseManager):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Назад", callback_data="back_to_main")]])
     await callback.message.edit_text(text, reply_markup=keyboard)
 
+async def get_or_create_marzban_username(user_id: int, event_from_user: User, db: DatabaseManager) -> str:
+    user = await db.get_user(user_id)
+    if user and user.get('marzban_username'):
+        return user['marzban_username']
+    
+    tg_name = event_from_user.username or event_from_user.first_name
+    clean_name = "".join(c for c in tg_name.lower() if c.isalnum() or c == "_")
+    marzban_username = f"{user_id}_{clean_name}"
+    
+    await db.update_marzban_username(user_id, marzban_username)
+    return marzban_username
+
 @router.callback_query(F.data == "my_subscription")
 async def my_subscription_handler(callback: CallbackQuery, db: DatabaseManager, marzban: MarzbanManager):
-    prefix = os.getenv("MARZBAN_USER_PREFIX", "user_")
-    tg_name = callback.from_user.username or callback.from_user.first_name
-    clean_name = "".join(c for c in tg_name.lower() if c.isalnum() or c == "_")
-    marzban_username = f"{callback.from_user.id}_{clean_name}"
+    marzban_username = await get_or_create_marzban_username(callback.from_user.id, callback.from_user, db)
     
     try:
         m_user = await marzban.get_user(marzban_username)
         sub_prefix = os.getenv("SUB_URL_PREFIX", "").rstrip("/")
-        full_sub_url = f"{sub_prefix}{m_user.subscription_url}" if sub_prefix else m_user.subscription_url
-        text = f"Ваша подписка:\n\nЛогин: `{m_user.username}`\nСтатус: {m_user.status}\nТрафик: {round(m_user.used_traffic / (1024**3), 2)} ГБ / {round(m_user.data_limit / (1024**3), 2) if m_user.data_limit else 'Безлимит'} ГБ\nИстекает: {m_user.expire if m_user.expire else 'Никогда'}"
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Продлить подписку", callback_data="sub_plans:renew")],
-            [InlineKeyboardButton(text="Открыть в браузере", url=full_sub_url)],
-            [InlineKeyboardButton(text="v2rayTun", url=f"v2raytun://import/{full_sub_url}")],
-            [InlineKeyboardButton(text="Streisand", url=f"streisand://import/{full_sub_url}")],
-            [InlineKeyboardButton(text="Получить QR-код", callback_data=f"get_qr:{marzban_username}")],
-            [InlineKeyboardButton(text="Назад", callback_data="back_to_main")]
-        ])
-        await callback.message.edit_text(text, reply_markup=keyboard)
-    except Exception:
-        await callback.message.edit_text("У вас еще нет активной подписки.\nЖелаете приобрести?", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Купить подписку", callback_data="sub_plans:buy")], [InlineKeyboardButton(text="Назад", callback_data="back_to_main")]]))
+        
+        # Robust handling of subscription URL
+        full_sub_url = None
+        if hasattr(m_user, 'subscription_url') and m_user.subscription_url:
+            if sub_prefix and not m_user.subscription_url.startswith("http"):
+                full_sub_url = f"{sub_prefix}{m_user.subscription_url}"
+            else:
+                full_sub_url = m_user.subscription_url
+        
+        # Format expire date
+        expire_str = "Никогда"
+        if hasattr(m_user, 'expire') and m_user.expire:
+            try:
+                expire_dt = datetime.fromtimestamp(m_user.expire)
+                expire_str = expire_dt.strftime("%d.%m.%Y %H:%M")
+            except Exception:
+                expire_str = str(m_user.expire)
+        
+        # Format traffic
+        used_gb = round(m_user.used_traffic / (1024**3), 2) if hasattr(m_user, 'used_traffic') else 0
+        limit_gb = round(m_user.data_limit / (1024**3), 2) if hasattr(m_user, 'data_limit') and m_user.data_limit else "Безлимит"
+        
+        status_map = {
+            "active": "✅ Активна",
+            "expired": "❌ Истекла",
+            "limited": "⚠️ Ограничена",
+            "disabled": "🚫 Отключена",
+            "on_hold": "⏳ В ожидании"
+        }
+        status_text = status_map.get(m_user.status, m_user.status) if hasattr(m_user, 'status') else "Неизвестно"
+
+        text = (
+            f"<b>Ваша подписка:</b>\n\n"
+            f"👤 Логин: <code>{m_user.username}</code>\n"
+            f"📊 Статус: {status_text}\n"
+            f"💾 Трафик: {used_gb} ГБ / {limit_gb} ГБ\n"
+            f"📅 Истекает: {expire_str}"
+        )
+        
+        buttons = [[InlineKeyboardButton(text="Продлить подписку", callback_data="sub_plans:renew")]]
+        
+        if full_sub_url:
+            buttons.append([InlineKeyboardButton(text="Открыть в браузере", url=full_sub_url)])
+            buttons.append([
+                InlineKeyboardButton(text="v2rayTun", url=f"v2raytun://import/{full_sub_url}"),
+                InlineKeyboardButton(text="Streisand", url=f"streisand://import/{full_sub_url}")
+            ])
+            buttons.append([InlineKeyboardButton(text="Получить QR-код", callback_data=f"get_qr:{marzban_username}")])
+        
+        buttons.append([InlineKeyboardButton(text="Назад", callback_data="back_to_main")])
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+        
+        if callback.message.photo:
+            await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+            await callback.message.delete()
+        else:
+            await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+            
+    except Exception as e:
+        logger.error(f"Error in my_subscription_handler for {marzban_username}: {e}", exc_info=True)
+        await callback.message.edit_text(
+            "У вас еще нет активной подписки или произошла ошибка при получении данных.\n\n"
+            "Если вы только что оплатили подписку, подождите несколько секунд и попробуйте снова.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="Купить подписку", callback_data="sub_plans:buy")],
+                [InlineKeyboardButton(text="Обновить", callback_data="my_subscription")],
+                [InlineKeyboardButton(text="Назад", callback_data="back_to_main")]
+            ])
+        )
 
 @router.callback_query(F.data.startswith("sub_plans:"))
 async def sub_plans_menu(callback: CallbackQuery, db: DatabaseManager):
@@ -91,10 +157,8 @@ async def sub_plans_menu(callback: CallbackQuery, db: DatabaseManager):
     title = "Продление подписки" if action == "renew" else "Покупка подписки"
     await callback.message.edit_text(f"<b>{title}</b>\n\nВыберите период:", reply_markup=keyboard)
 
-async def process_subscription_action(user_id: int, action: str, days: int, marzban: MarzbanManager, event_from_user: User):
-    tg_name = event_from_user.username or event_from_user.first_name
-    clean_name = "".join(c for c in tg_name.lower() if c.isalnum() or c == "_")
-    marzban_username = f"{user_id}_{clean_name}"
+async def process_subscription_action(user_id: int, action: str, days: int, marzban: MarzbanManager, event_from_user: User, db: DatabaseManager):
+    marzban_username = await get_or_create_marzban_username(user_id, event_from_user, db)
     user_note = f"TG ID: {user_id}"
     if event_from_user.username: user_note += f" | @{event_from_user.username}"
     user_note += f" | {event_from_user.full_name}"
@@ -103,17 +167,30 @@ async def process_subscription_action(user_id: int, action: str, days: int, marz
         await marzban.get_user(marzban_username)
         user_exists = True
     except Exception: user_exists = False
+    
     if action == "buy" and not user_exists:
         limit_gb = int(os.getenv("DEFAULT_DATA_LIMIT_GB", "50"))
         data_limit = (limit_gb * 1024**3) if limit_gb > 0 else None
-        user_data = {"username": marzban_username, "proxies": {"vless": {}}, "expire": int((datetime.now() + timedelta(days=days)).timestamp()), "data_limit": data_limit, "note": user_note}
+        
+        # Ensure we at least enable vless and vmess as defaults if not specified
+        user_data = {
+            "username": marzban_username,
+            "proxies": {"vless": {}, "vmess": {}}, 
+            "expire": int((datetime.now() + timedelta(days=days)).timestamp()),
+            "data_limit": data_limit,
+            "note": user_note
+        }
         await marzban.create_user(user_data)
     else:
         try:
             m_user = await marzban.get_user(marzban_username)
-            start_date = max(m_user.expire if m_user.expire else int(datetime.now().timestamp()), int(datetime.now().timestamp()))
+            # If user was expired, start from now. If not, add to existing expire.
+            current_expire = m_user.expire if m_user.expire else int(datetime.now().timestamp())
+            start_date = max(current_expire, int(datetime.now().timestamp()))
             await marzban.modify_user(marzban_username, {"expire": start_date + (days * 24 * 3600)})
-        except Exception as e: raise e
+        except Exception as e:
+            logger.error(f"Failed to modify user {marzban_username}: {e}")
+            raise e
 
 @router.callback_query(F.data.startswith("checkout:"))
 async def checkout_handler(callback: CallbackQuery, db: DatabaseManager, marzban: MarzbanManager, crypto: CryptoBotClient):
@@ -122,7 +199,7 @@ async def checkout_handler(callback: CallbackQuery, db: DatabaseManager, marzban
     user = await db.get_user(user_id)
     if user['balance'] >= price:
         try:
-            await process_subscription_action(user_id, action, days, marzban, callback.from_user)
+            await process_subscription_action(user_id, action, days, marzban, callback.from_user, db)
             await db.update_balance(user_id, -float(price))
             await callback.answer("Успешно")
             await my_subscription_handler(callback, db, marzban)
@@ -165,7 +242,7 @@ async def check_payment_handler(callback: CallbackQuery, db: DatabaseManager, bo
                     days, price = int(days), int(price)
                     user = await db.get_user(callback.from_user.id)
                     if user['balance'] >= price:
-                        await process_subscription_action(callback.from_user.id, action, days, marzban, callback.from_user)
+                        await process_subscription_action(callback.from_user.id, action, days, marzban, callback.from_user, db)
                         await db.update_balance(callback.from_user.id, -float(price))
                         await callback.message.answer("Оплата подтверждена, подписка активирована")
                     else: await callback.message.answer("Оплата подтверждена, баланс пополнен")
@@ -178,11 +255,14 @@ async def check_payment_handler(callback: CallbackQuery, db: DatabaseManager, bo
         logger.error(f"Error checking payment: {e}"); await callback.answer("Ошибка проверки")
 
 @router.callback_query(F.data.startswith("get_qr:"))
-async def get_qr_handler(callback: CallbackQuery, marzban: MarzbanManager):
+async def get_qr_handler(callback: CallbackQuery, db: DatabaseManager, marzban: MarzbanManager):
     marzban_username = callback.data.split(":")[1]
     try:
         m_user = await marzban.get_user(marzban_username)
-        await callback.message.answer_photo(photo=generate_qr_code(m_user.subscription_url), caption=f"Ваш QR-код (<code>{m_user.username}</code>)")
+        if hasattr(m_user, 'subscription_url') and m_user.subscription_url:
+            await callback.message.answer_photo(photo=generate_qr_code(m_user.subscription_url), caption=f"Ваш QR-код (<code>{m_user.username}</code>)")
+        else:
+            await callback.answer("Ссылка для QR-кода еще не доступна", show_alert=True)
         await callback.answer()
     except Exception as e:
         logger.error(f"Error generating QR: {e}"); await callback.answer("Ошибка")

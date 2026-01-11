@@ -66,9 +66,12 @@ async def test_my_subscription_handler_success():
     callback.from_user.username = "testuser"
     callback.message = AsyncMock()
     callback.message.edit_text = AsyncMock()
+    callback.message.photo = None
     callback.answer = AsyncMock()
     
     db = AsyncMock()
+    db.get_user.return_value = {"telegram_id": 123, "marzban_username": "123_testuser"}
+    
     marzban = AsyncMock()
     # Mock Marzban user response
     m_user = MagicMock()
@@ -76,7 +79,7 @@ async def test_my_subscription_handler_success():
     m_user.status = "active"
     m_user.used_traffic = 1024**3
     m_user.data_limit = 5 * 1024**3
-    m_user.expire = "2026-01-01"
+    m_user.expire = 1735689600 # Valid timestamp
     m_user.subscription_url = "/sub/test"
     marzban.get_user.return_value = m_user
     
@@ -85,7 +88,7 @@ async def test_my_subscription_handler_success():
     
     callback.message.edit_text.assert_called()
     args, kwargs = callback.message.edit_text.call_args
-    assert "Ваша подписка:" in args[0]
+    assert "<b>Ваша подписка:</b>" in args[0]
     
     # Check button URLs
     kb = kwargs['reply_markup']
@@ -118,7 +121,9 @@ async def test_get_qr_handler_success():
     m_user.subscription_url = "https://link.com"
     marzban.get_user.return_value = m_user
     
-    await get_qr_handler(callback, marzban)
+    db = AsyncMock()
+    
+    await get_qr_handler(callback, db, marzban)
     
     callback.message.answer_photo.assert_called()
     args, kwargs = callback.message.answer_photo.call_args
