@@ -35,17 +35,25 @@ class MarzbanManager:
     async def get_user(self, username: str):
         """Возвращает информацию о пользователе."""
         await self._ensure_token()
-        return await self.client.get_user(username, token=self.token)
-
-    async def _request(self, method: str, endpoint: str, **kwargs):
         try:
-            # This is a hypothetical internal helper, but since we use self.client directly,
-            # we need to catch the exception where it's called.
-            pass
+            return await self.client.get_user(username, token=self.token)
         except Exception as e:
-            if hasattr(e, 'response') and hasattr(e.response, 'text'):
-                logger.error(f"Marzban API Detail Error: {e.response.text}")
+            if self._is_unauthorized(e):
+                self.token = None
+                await self._ensure_token()
+                return await self.client.get_user(username, token=self.token)
             raise e
+
+    def _is_unauthorized(self, e: Exception) -> bool:
+        """Проверяет, является ли ошибка ошибкой авторизации (401)."""
+        if hasattr(e, 'response'):
+            return e.response.status_code == 401
+        # Some libraries raise exceptions with status in message or as attribute
+        if hasattr(e, 'status_code'):
+            return e.status_code == 401
+        if "401" in str(e):
+            return True
+        return False
 
     async def create_user(self, user_dict: dict):
         """Создает пользователя."""
@@ -54,6 +62,10 @@ class MarzbanManager:
         try:
             return await self.client.add_user(user_obj, token=self.token)
         except Exception as e:
+            if self._is_unauthorized(e):
+                self.token = None
+                await self._ensure_token()
+                return await self.client.add_user(user_obj, token=self.token)
             if hasattr(e, 'response'):
                 logger.error(f"Marzban API Error Body: {e.response.text}")
             raise e
@@ -65,6 +77,10 @@ class MarzbanManager:
         try:
             return await self.client.modify_user(username, user_obj, token=self.token)
         except Exception as e:
+            if self._is_unauthorized(e):
+                self.token = None
+                await self._ensure_token()
+                return await self.client.modify_user(username, user_obj, token=self.token)
             if hasattr(e, 'response'):
                 logger.error(f"Marzban API Error Body: {e.response.text}")
             raise e

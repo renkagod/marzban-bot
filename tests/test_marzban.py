@@ -94,3 +94,26 @@ async def test_modify_user(mock_marzban, config):
     args, kwargs = mock_client.modify_user.call_args
     assert args[0] == "test_user"
     assert args[1].expire == 12345678
+
+@pytest.mark.asyncio
+@patch("app.core.marzban_client.MarzbanAPI")
+async def test_token_refresh_on_401(mock_marzban, config):
+    mock_client = MagicMock()
+    mock_marzban.return_value = mock_client
+    
+    # First call fails with 401, second succeeds
+    error_401 = Exception("401 Unauthorized")
+    error_401.response = MagicMock()
+    error_401.response.status_code = 401
+    
+    mock_client.get_token = AsyncMock(return_value="new_token")
+    mock_client.get_user = AsyncMock(side_effect=[error_401, {"username": "test"}])
+
+    manager = MarzbanManager(config["address"], config["username"], config["password"])
+    manager.token = "old_token"
+    
+    result = await manager.get_user("test")
+    assert result == {"username": "test"}
+    assert manager.token == "new_token"
+    assert mock_client.get_token.call_count == 1
+    assert mock_client.get_user.call_count == 2
