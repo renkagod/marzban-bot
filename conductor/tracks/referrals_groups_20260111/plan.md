@@ -8,7 +8,7 @@
 - [x] Task: Group-based Pricing Implementation (cf2f62b)
 
 ## Phase 3: Seamless Payments & UI Refinement
-- [ ] Task: UI Cleanup
+- [~] Task: UI Cleanup
     - [ ] Sub-task: Remove all emojis from messages and buttons
     - [ ] Sub-task: Rename '👫 Рефералы' to 'Пригласить друзей'
     - [ ] Sub-task: Rename '💎 Моя подписка' to 'Подписка'

@@ -36,8 +36,8 @@ async def start_cmd(message: Message, db: DatabaseManager):
 
     text = f"Привет, {message.from_user.full_name}!\n\nБаланс: {user['balance']} руб.\n\nВыберите действие:"
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Подписка", callback_data="my_subscription")],
-        [InlineKeyboardButton(text="Пригласить друзей", callback_data="referrals")],
+        [InlineKeyboardButton(text="Мои услуги", callback_data="my_subscription")],
+        [InlineKeyboardButton(text="Партнерская программа", callback_data="referrals")],
         [InlineKeyboardButton(text="Поддержка", callback_data="support")]
     ])
     await message.answer(text, reply_markup=keyboard)
@@ -94,20 +94,20 @@ async def my_subscription_handler(callback: CallbackQuery, db: DatabaseManager, 
         limit_gb = round(m_user.data_limit / (1024**3), 2) if hasattr(m_user, 'data_limit') and m_user.data_limit else "Безлимит"
         
         status_map = {
-            "active": "✅ Активна",
-            "expired": "❌ Истекла",
-            "limited": "⚠️ Ограничена",
-            "disabled": "🚫 Отключена",
-            "on_hold": "⏳ В ожидании"
+            "active": "Активна",
+            "expired": "Истекла",
+            "limited": "Ограничена",
+            "disabled": "Отключена",
+            "on_hold": "В ожидании"
         }
         status_text = status_map.get(m_user.status, m_user.status) if hasattr(m_user, 'status') else "Неизвестно"
 
         text = (
             f"<b>Ваша подписка:</b>\n\n"
-            f"👤 Логин: <code>{m_user.username}</code>\n"
-            f"📊 Статус: {status_text}\n"
-            f"💾 Трафик: {used_gb} ГБ / {limit_gb} ГБ\n"
-            f"📅 Истекает: {expire_str}"
+            f"Логин: <code>{m_user.username}</code>\n"
+            f"Статус: {status_text}\n"
+            f"Трафик: {used_gb} ГБ / {limit_gb} ГБ\n"
+            f"Истекает: {expire_str}"
         )
         
         buttons = [[InlineKeyboardButton(text="Продлить подписку", callback_data="sub_plans:renew")]]
@@ -271,7 +271,11 @@ async def get_qr_handler(callback: CallbackQuery, db: DatabaseManager, marzban: 
 async def back_to_main_handler(callback: CallbackQuery, db: DatabaseManager):
     user = await db.get_user(callback.from_user.id)
     text = f"Привет, {callback.from_user.full_name}!\n\nБаланс: {user['balance']} руб.\n\nВыберите действие:"
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Подписка", callback_data="my_subscription")], [InlineKeyboardButton(text="Пригласить друзей", callback_data="referrals")], [InlineKeyboardButton(text="Поддержка", callback_data="support")]])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Мои услуги", callback_data="my_subscription")],
+        [InlineKeyboardButton(text="Партнерская программа", callback_data="referrals")],
+        [InlineKeyboardButton(text="Поддержка", callback_data="support")]
+    ])
     await callback.message.edit_text(text, reply_markup=keyboard)
 
 @router.callback_query(F.data == "support")
@@ -292,7 +296,11 @@ async def check_subscription_handler(callback: CallbackQuery, db: DatabaseManage
             await callback.message.delete()
             user = await db.get_user(user_id)
             text = f"Привет, {callback.from_user.full_name}!\n\nБаланс: {user['balance']} руб.\n\nВыберите действие:"
-            keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Подписка", callback_data="my_subscription")], [InlineKeyboardButton(text="Пригласить друзей", callback_data="referrals")], [InlineKeyboardButton(text="Поддержка", callback_data="support")]])
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="Мои услуги", callback_data="my_subscription")],
+                [InlineKeyboardButton(text="Партнерская программа", callback_data="referrals")],
+                [InlineKeyboardButton(text="Поддержка", callback_data="support")]
+            ])
             await callback.message.answer(text, reply_markup=keyboard)
         else: await callback.answer("Вы не подписаны на канал")
     except Exception as e:
