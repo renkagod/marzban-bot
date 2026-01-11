@@ -7,7 +7,7 @@
 - [x] Task: Database Setup (ce12afd)
     - [ ] Sub-task: Design and implement SQLite schema using aiosqlite
     - [ ] Sub-task: Create database manager for CRUD operations on users and groups
-- [ ] Task: Marzban API Integration
+- [x] Task: Marzban API Integration (ea825b5)
     - [ ] Sub-task: Initialize Marzban client and implement a connectivity check
     - [ ] Sub-task: Create a wrapper for core Marzban operations (get status, list users)
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Foundation & API' (Protocol in workflow.md)
