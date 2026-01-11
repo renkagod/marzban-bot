@@ -132,12 +132,10 @@ async def checkout_handler(callback: CallbackQuery, db: DatabaseManager, marzban
         if action == "buy":
             user_data = {
                 "username": marzban_username,
-                "proxies": {"vless": {}, "vmess": {}, "trojan": {}, "shadowsocks": {}},
+                "proxies": {}, # Let Marzban enable default protocols
                 "expire": int((datetime.now() + timedelta(days=days)).timestamp()),
                 "data_limit": 50 * 1024**3
             }
-            # Many Marzban versions require explicitly defining empty dicts or specific config
-            # Let's try to pass it simply first, but ensuring it matches UserCreate model
             await marzban.create_user(user_data)
         else:
             m_user = await marzban.get_user(marzban_username)
