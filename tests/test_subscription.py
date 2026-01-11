@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from app.bot.middlewares.subscription import SubscriptionMiddleware
 from aiogram.types import Message, ChatMemberMember, ChatMemberLeft
 
@@ -32,7 +32,9 @@ async def test_subscription_middleware_not_subscribed():
     data = {"db": AsyncMock()}
     data["db"].get_user = AsyncMock(return_value=None) # First time user
     
-    result = await middleware(handler, event, data)
+    with patch('os.getenv', return_value="https://t.me/invite"):
+        result = await middleware(handler, event, data)
+    
     assert result is None
     handler.assert_not_called()
     event.answer.assert_called()

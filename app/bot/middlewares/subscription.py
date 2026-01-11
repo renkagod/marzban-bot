@@ -3,6 +3,7 @@ from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Message, InlineKeyboardMarkup, InlineKeyboardButton
 from app.core.database import DatabaseManager
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +39,14 @@ class SubscriptionMiddleware(BaseMiddleware):
         except Exception as e:
             logger.error(f"Error checking subscription: {e}")
 
+        # Use URL from env or fallback to username formatting
+        channel_url = os.getenv("CHANNEL_URL")
+        if not channel_url:
+            channel_url = f"https://t.me/{self.channel_id.replace('@', '')}"
+
         # If not subscribed or error, prompt to subscribe
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Подписаться на канал", url=f"https://t.me/{self.channel_id.replace('@', '')}")],
+            [InlineKeyboardButton(text="Подписаться на канал", url=channel_url)],
             [InlineKeyboardButton(text="Проверить подписку", callback_data="check_subscription")]
         ])
         
