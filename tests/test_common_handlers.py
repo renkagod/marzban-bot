@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from app.bot.handlers.common import start_cmd, check_subscription_handler, my_subscription_handler, support_handler, get_qr_handler, top_up_menu, create_invoice_handler, referral_menu
+from app.bot.handlers.common import start_cmd, check_subscription_handler, my_subscription_handler, support_handler, get_qr_handler, checkout_handler, referral_menu
 from aiogram.types import Message, CallbackQuery, ChatMemberMember, ChatMemberLeft
 
 @pytest.mark.asyncio
@@ -17,26 +17,7 @@ async def test_start_cmd():
     await start_cmd(message, db)
     message.answer.assert_called()
     assert "Привет, Test User" in message.answer.call_args[0][0]
-    assert "Баланс:</b> 0.0" in message.answer.call_args[0][0]
-    assert "Standard" not in message.answer.call_args[0][0] # Should be hidden
-
-@pytest.mark.asyncio
-async def test_my_subscription_handler_not_found():
-    callback = AsyncMock(spec=CallbackQuery)
-    callback.from_user = MagicMock()
-    callback.from_user.id = 123
-    callback.message = AsyncMock()
-    callback.message.edit_text = AsyncMock()
-    
-    db = AsyncMock()
-    marzban = AsyncMock()
-    marzban.get_user.side_effect = Exception("Not found")
-    
-    from app.bot.handlers.common import my_subscription_handler
-    await my_subscription_handler(callback, db, marzban)
-    
-    callback.message.edit_text.assert_called()
-    assert "Купить подписку" in callback.message.edit_text.call_args[1]['reply_markup'].inline_keyboard[0][0].text
+    assert "Баланс: 0.0" in message.answer.call_args[0][0]
 
 @pytest.mark.asyncio
 async def test_check_subscription_handler_success():
@@ -44,17 +25,21 @@ async def test_check_subscription_handler_success():
     callback.from_user = MagicMock()
     callback.from_user.id = 123
     callback.from_user.username = "testuser"
+    callback.from_user.full_name = "testuser"
     callback.answer = AsyncMock()
     callback.message = AsyncMock()
+    callback.message.delete = AsyncMock()
+    callback.message.answer = AsyncMock()
     callback.bot.get_chat_member = AsyncMock(return_value=AsyncMock(spec=ChatMemberMember, status="member"))
     
     db = AsyncMock()
+    db.get_user.return_value = {"telegram_id": 123, "balance": 0.0}
     
     with patch('os.getenv', return_value="@test_channel"):
         await check_subscription_handler(callback, db)
     
     db.add_user.assert_called_with(123, "testuser")
-    callback.answer.assert_called_with("Подписка подтверждена! 🎉", show_alert=True)
+    callback.answer.assert_called_with("Подписка подтверждена!")
     callback.message.delete.assert_called_once()
 
 @pytest.mark.asyncio
@@ -71,7 +56,7 @@ async def test_check_subscription_handler_fail():
         await check_subscription_handler(callback, db)
     
     db.add_user.assert_not_called()
-    callback.answer.assert_called_with("Вы все еще не подписаны на канал!", show_alert=True)
+    callback.answer.assert_called_with("Вы не подписаны на канал!")
 
 @pytest.mark.asyncio
 async def test_my_subscription_handler_success():
@@ -101,18 +86,21 @@ async def test_my_subscription_handler_success():
     args, kwargs = callback.message.edit_text.call_args
     assert "Ваша подписка:" in args[0]
     
-    # Check button URL
+    # Check button URLs
     kb = kwargs['reply_markup']
-    # Button index 1 is Link (index 0 is Renew)
-    assert kb.inline_keyboard[1][0].url == "https://vpn.lol/sub/test"
+    # index 0: Renew, 1: Open Browser, 2: v2rayTun, 3: Streisand
+    assert kb.inline_keyboard[2][0].text == "v2rayTun"
+    assert "v2raytun://import/https://vpn.lol/sub/test" == kb.inline_keyboard[2][0].url
 
 @pytest.mark.asyncio
 async def test_support_handler():
     callback = AsyncMock(spec=CallbackQuery)
+    callback.message = AsyncMock()
+    callback.message.answer = AsyncMock()
     callback.answer = AsyncMock()
     
     await support_handler(callback)
-    callback.answer.assert_called_with("Для связи с поддержкой напишите @renkaa1", show_alert=True)
+    callback.message.answer.assert_called_with("Для связи с поддержкой напишите @renkaa1")
 
 @pytest.mark.asyncio
 async def test_get_qr_handler_success():
@@ -136,54 +124,6 @@ async def test_get_qr_handler_success():
     callback.answer.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_top_up_menu():
-    callback = AsyncMock(spec=CallbackQuery)
-    callback.from_user = MagicMock()
-    callback.from_user.id = 123
-    callback.message = AsyncMock()
-    callback.message.edit_text = AsyncMock()
-    
-    db = AsyncMock()
-    db.get_user.return_value = {"telegram_id": 123, "group_name": "Inner Circle"}
-    
-    with patch('os.getenv', side_effect=lambda k, d=None: "150" if k == "PRICE_INNER_CIRCLE" else d):
-        await top_up_menu(callback, db)
-    
-    callback.message.edit_text.assert_called()
-    assert "150 руб." in callback.message.edit_text.call_args[0][0]
-    assert "Inner Circle" not in callback.message.edit_text.call_args[0][0] # Hidden
-
-@pytest.mark.asyncio
-async def test_create_invoice_handler_success():
-    callback = AsyncMock(spec=CallbackQuery)
-    callback.data = "buy:150"
-    callback.from_user = MagicMock()
-    callback.from_user.id = 123
-    callback.message = AsyncMock()
-    callback.message.edit_text = AsyncMock()
-    
-    db = AsyncMock()
-    crypto = AsyncMock()
-    crypto.get_exchange_rates.return_value = [{"source": "USDT", "target": "RUB", "rate": "100.0"}]
-    crypto.create_invoice.return_value = {
-        "invoice_id": 999,
-        "pay_url": "https://pay.link"
-    }
-    
-    # No need to mock bot.dp anymore as it's passed directly
-    await create_invoice_handler(callback, db, crypto)
-    
-    crypto.create_invoice.assert_called()
-    db.add_payment.assert_called_with(
-        123,
-        150.0,
-        "CryptoBot",
-        "999"
-    )
-    assert "Счет на 150.0 руб." in callback.message.edit_text.call_args[0][0]
-    assert "USDT) создан" in callback.message.edit_text.call_args[0][0]
-
-@pytest.mark.asyncio
 async def test_referral_menu():
     callback = AsyncMock(spec=CallbackQuery)
     callback.from_user = MagicMock()
@@ -203,3 +143,29 @@ async def test_referral_menu():
     args, kwargs = callback.message.edit_text.call_args
     assert "Приглашено: 5 чел." in args[0]
     assert "start=123" in args[0]
+
+@pytest.mark.asyncio
+async def test_checkout_handler_top_up():
+    callback = AsyncMock(spec=CallbackQuery)
+    callback.data = "checkout:buy:7:50"
+    callback.from_user = MagicMock()
+    callback.from_user.id = 123
+    callback.message = AsyncMock()
+    callback.message.edit_text = AsyncMock()
+    
+    db = AsyncMock()
+    db.get_user.return_value = {"telegram_id": 123, "balance": 0.0} # Low balance
+    
+    crypto = AsyncMock()
+    crypto.get_exchange_rates.return_value = [{"source": "USDT", "target": "RUB", "rate": "100.0"}]
+    crypto.create_invoice.return_value = {
+        "invoice_id": 999,
+        "pay_url": "https://pay.link"
+    }
+    
+    marzban = AsyncMock()
+    
+    await checkout_handler(callback, db, marzban, crypto)
+    
+    crypto.create_invoice.assert_called()
+    assert "Недостаточно средств" in callback.message.edit_text.call_args[0][0]

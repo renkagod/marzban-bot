@@ -20,9 +20,9 @@ class HealthMonitor:
         
         if status != self.last_status:
             if not status:
-                await self.send_alert("⚠️ ВНИМАНИЕ: Marzban API недоступен!")
+                await self.send_alert("ВНИМАНИЕ: Marzban API недоступен!")
             else:
-                await self.send_alert("✅ Marzban API снова в строю.")
+                await self.send_alert("Marzban API снова в строю.")
             self.last_status = status
 
     async def send_alert(self, text: str):

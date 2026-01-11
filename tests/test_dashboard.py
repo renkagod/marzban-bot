@@ -24,6 +24,6 @@ async def test_main_menu_with_db_data():
     
     args, kwargs = message.answer.call_args
     text = args[0]
-    assert "Баланс:</b> 150.0" in text
+    assert "Баланс: 150.0" in text
     assert "Standard" not in text # Hidden from UI
     assert kwargs['reply_markup'] is not None
