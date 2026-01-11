@@ -12,8 +12,21 @@ def is_admin(message: Message):
     admin_id = os.getenv("ADMIN_ID")
     return str(message.from_user.id) == str(admin_id)
 
-@router.message(Command("admin"), F.from_user.id.cast(str) == os.getenv("ADMIN_ID"))
+@router.message(Command("start"))
+async def start_cmd(message: Message):
+    await message.answer(
+        f"Привет, {message.from_user.full_name}! 👋\n"
+        "Я бот для управления Marzban.\n\n"
+        "Используйте кнопки меню для навигации."
+    )
+
+@router.message(Command("admin"))
 async def admin_menu(message: Message, db: DatabaseManager):
+    # Проверка на админа
+    admin_id = os.getenv("ADMIN_ID")
+    if str(message.from_user.id) != str(admin_id):
+        return # Просто игнорируем, если не админ
+
     users = await db.get_all_users()
     
     if not users:
